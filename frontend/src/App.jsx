@@ -1,7 +1,18 @@
-import React from 'react'
 
-export default function App() {
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import AuthPage from "./pages/AuthPage";
+import Home from "./pages/Home";
+
+function App() {
   return (
-    <div>App</div>
-  )
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AuthPage />} />
+        <Route path="/home" element={<Home />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
+
+export default App;
