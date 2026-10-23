@@ -1,5 +1,6 @@
 
 import { UserPlus, TrendingUp, ArrowUpRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const students = [
   { name: "Riya Singh", course: "B.Tech · Web Development" },
@@ -10,6 +11,7 @@ const students = [
 const topics = ["Web Development", "Hackathons", "Data Structures", "Internships"];
 
 function RightSidebar() {
+  const navigate = useNavigate();
   return (
     <div className="space-y-5">
       <section className="rounded-2xl border border-white/10 bg-[#1b1b1b] p-5">
@@ -30,6 +32,7 @@ function RightSidebar() {
               <button
                 aria-label={`Connect with ${student.name}`}
                 title="Connect"
+                onClick={() => navigate("/explore")}
                 className="rounded-lg p-2 text-yellow-400 hover:bg-yellow-400/10"
               >
                 <UserPlus size={17} />
@@ -38,7 +41,7 @@ function RightSidebar() {
           ))}
         </div>
 
-        <button className="mt-5 flex items-center gap-1 text-sm text-yellow-400 hover:text-yellow-300">
+        <button onClick={() => navigate("/explore")} className="mt-5 flex items-center gap-1 text-sm text-yellow-400 hover:text-yellow-300">
           Discover students <ArrowUpRight size={15} />
         </button>
       </section>

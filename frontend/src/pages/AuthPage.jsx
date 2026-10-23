@@ -139,9 +139,8 @@ function AuthPage() {
             return;
         }
 
-        setNotice(
-            "This is a frontend demo. Real login will be enabled when authentication is connected."
-        );
+        setNotice("Demo sign-in complete. Opening your community...");
+        window.setTimeout(() => navigate("/home"), 350);
     }
 
     function toggleSkill(skill) {
@@ -153,12 +152,19 @@ function AuthPage() {
     }
 
     function finishProfile(skip = false) {
-        setNotice(
-            skip
-                ? "You can complete your profile later."
-                : "Your profile preview is ready!"
-        );
-
+        const profile = {
+            name: form.name.trim() || "Your Name",
+            headline: [form.course, form.year, "Student"].filter(Boolean).join(" · ") || "Student | Learning and building",
+            university: form.university.trim(),
+            course: form.course,
+            year: form.year,
+            bio: form.bio.trim(),
+            skills: selectedSkills,
+            location: "",
+        };
+        localStorage.setItem("connectly-profile", JSON.stringify(profile));
+        localStorage.setItem("connectly-demo-session", JSON.stringify({ name: profile.name, email: form.email.trim() }));
+        if (skip) localStorage.setItem("connectly-profile", JSON.stringify({ ...profile, skills: [] }));
         navigate("/home");
     }
 
