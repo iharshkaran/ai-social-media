@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://orbitu-api.onrender.com/api/:path*"
+      "destination": "https://orbitu.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
