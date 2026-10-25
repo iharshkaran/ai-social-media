@@ -17,7 +17,7 @@ export const api = {
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me"),
   updateProfile: (payload) => {
-    const fields = ["name", "headline", "university", "course", "year", "location", "bio", "skills", "photo", "portfolioUrl"];
+    const fields = ["name", "headline", "university", "course", "year", "location", "bio", "skills", "photo", "banner", "projects", "education", "featured", "portfolioUrl"];
     const profile = Object.fromEntries(fields.filter((field) => field in payload).map((field) => [field, payload[field]]));
     return request("/users/me", { method: "PATCH", body: JSON.stringify(profile) });
   },
@@ -27,12 +27,15 @@ export const api = {
     return request(`/users?${params.toString()}`, {}, true);
   },
   user: (id) => request(`/users/${encodeURIComponent(id)}`),
-  userPosts: (id) => request(`/users/${encodeURIComponent(id)}/posts`),
+  userPosts: (id, page = 1, limit = 50) => request(`/users/${encodeURIComponent(id)}/posts?page=${page}&limit=${limit}`),
+  userPostsWithMeta: (id, page = 1, limit = 50) => request(`/users/${encodeURIComponent(id)}/posts?page=${page}&limit=${limit}`, {}, true),
   connections: () => request("/connections"),
   requestConnection: (id) => request(`/users/${id}/connections`, { method: "POST" }),
   respondConnection: (id, action) => request(`/connections/${id}`, { method: "PATCH", body: JSON.stringify({ action }) }),
   removeConnection: (id) => request(`/connections/${id}`, { method: "DELETE" }),
   posts: (page = 1, limit = 10) => request(`/posts?page=${page}&limit=${limit}`, {}, true),
+  post: (id) => request(`/posts/${encodeURIComponent(id)}`),
+  postComments: (id) => request(`/posts/${encodeURIComponent(id)}/comments`),
   createPost: (payload) => request("/posts", { method: "POST", body: JSON.stringify(payload) }),
   deletePost: (id) => request(`/posts/${id}`, { method: "DELETE" }),
   toggleLike: (id) => request(`/posts/${id}/like`, { method: "POST" }),

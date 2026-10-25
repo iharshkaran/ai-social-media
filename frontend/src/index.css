@@ -2,14 +2,12 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
-  --connectly-page: #111111;
-  --connectly-surface: #1b1b1b;
-  --connectly-input: #242424;
-  --connectly-border: rgb(255 255 255 / 10%);
-  --connectly-accent: #facc15;
+  --orbitu-page: #f0ece3;
+  --orbitu-accent: #6f56d9;
+  --orbitu-ink: #17182d;
 }
 
 * {
@@ -17,7 +15,7 @@
 }
 
 html {
-  background: var(--connectly-page);
+  background: var(--orbitu-page);
   scroll-behavior: smooth;
 }
 
@@ -25,8 +23,51 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: var(--connectly-page);
+  background: var(--orbitu-page);
+  color: var(--orbitu-ink);
   font-family: inherit;
+}
+
+.orbit-pattern-bg {
+  background-color: var(--orbitu-page);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(83, 70, 51, 0.16) 0.8px, transparent 1.25px),
+    radial-gradient(circle at 4px 3px, rgba(255, 255, 255, 0.38) 0.7px, transparent 1.15px),
+    radial-gradient(ellipse at 12% 16%, rgba(201, 190, 169, 0.25), transparent 28rem),
+    radial-gradient(ellipse at 88% 54%, rgba(210, 202, 185, 0.22), transparent 30rem),
+    repeating-linear-gradient(0deg, rgba(82, 69, 48, 0.018) 0, rgba(82, 69, 48, 0.018) 1px, transparent 1px, transparent 4px);
+  background-size: 9px 9px, 13px 13px, auto, auto, 100% 4px;
+}
+
+.orbit-nav-bg {
+  background-color: rgba(240, 236, 227, 0.94);
+}
+
+.orbit-feed-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #a89a80 transparent;
+}
+
+.orbit-feed-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.orbit-feed-scroll::-webkit-scrollbar-track {
+  margin-block: 6px;
+  border-radius: 999px;
+  background: rgba(126, 108, 77, 0.08);
+}
+
+.orbit-feed-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #a89a80;
+  background-clip: content-box;
+}
+
+.orbit-feed-scroll::-webkit-scrollbar-thumb:hover {
+  background: #75664f;
+  background-clip: content-box;
 }
 
 button,
@@ -41,14 +82,25 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+button:not(:disabled),
+a[href],
+label[for],
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 :focus-visible {
-  outline: 2px solid var(--connectly-accent);
+  outline: 2px solid var(--orbitu-accent);
   outline-offset: 3px;
 }
 
 ::selection {
-  color: #111111;
-  background: var(--connectly-accent);
+  color: #17182d;
+  background: #ffe35b;
 }
 
 @media (prefers-reduced-motion: reduce) {

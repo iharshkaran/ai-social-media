@@ -23,5 +23,5 @@ export async function getUser(req, res) {
 
 export async function getUserPosts(req, res) {
   const result = await listPosts({ userId: req.user._id, authorId: req.params.id, page: req.query.page, limit: req.query.limit });
-  return res.json({ success: true, data: result.posts, page: result.page, hasMore: result.hasMore });
+  return res.json({ success: true, data: result.posts, page: result.page, hasMore: result.hasMore, postCount: result.authorPostCount });
 }

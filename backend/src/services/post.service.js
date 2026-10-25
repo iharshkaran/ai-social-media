@@ -13,9 +13,10 @@ export function formatPost(post, { likes = 0, liked = false, comments = [] } = {
   const author = post.author || {};
   return {
     id: String(post._id), name: author.name || "Connectly member",
-    role: [author.course, author.year, author.university].filter(Boolean).join(" · ") || author.headline || "Student",
+    role: author.headline || [author.course, author.year, author.university].filter(Boolean).join(" · ") || "Student",
     avatar: author.photo || "", authorId: String(author._id || author),
     time: post.createdAt, category: post.category, text: post.text, image: post.image,
+    mediaUrl: post.mediaUrl || "", mediaType: post.mediaType || "", mediaName: post.mediaName || "",
     likes, liked, comments,
   };
 }
@@ -47,7 +48,20 @@ export async function listPosts({ userId, authorId, page = 1, limit = 20 }) {
     page: currentPage,
     hasMore,
     ownPostCount: currentPage === 1 ? await Post.countDocuments({ author: userId }) : undefined,
+    authorPostCount: currentPage === 1 && authorId ? await Post.countDocuments({ author: authorId }) : undefined,
   };
+}
+
+export async function getPostById({ postId, userId }) {
+  const post = await Post.findById(postId).populate("author", AUTHOR_FIELDS).lean();
+  if (!post) throw httpError(404, "Post not found.");
+  const [comments, likes, liked] = await Promise.all([
+    Comment.find({ post: post._id }).populate("author", "name photo").sort({ createdAt: 1 }).lean(),
+    Like.countDocuments({ post: post._id }),
+    Like.exists({ post: post._id, user: userId }),
+  ]);
+  const formattedComments = comments.map((comment) => ({ id: String(comment._id), name: comment.author?.name || "Student", photo: comment.author?.photo || "", text: comment.text, createdAt: comment.createdAt }));
+  return formatPost(post, { likes, liked: Boolean(liked), comments: formattedComments });
 }
 
 export async function createPost({ authorId, data }) {

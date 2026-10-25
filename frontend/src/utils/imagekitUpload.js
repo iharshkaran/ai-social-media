@@ -2,7 +2,7 @@ import { api } from "./api";
 
 const IMAGEKIT_UPLOAD_URL = "https://upload.imagekit.io/api/v1/files/upload";
 
-export async function uploadImageToImageKit(file, folder, onProgress) {
+export async function uploadFileToImageKit(file, folder, onProgress) {
   const auth = await api.imagekitAuth();
   const formData = new FormData();
   formData.append("file", file);
@@ -27,11 +27,11 @@ export async function uploadImageToImageKit(file, folder, onProgress) {
       let response = {};
       try { response = JSON.parse(request.responseText); } catch { /* Use the generic upload error below. */ }
       if (request.status < 200 || request.status >= 300) {
-        reject(new Error(response.message || response.help || "ImageKit could not upload this image."));
+        reject(new Error(response.message || response.help || "ImageKit could not upload this file."));
         return;
       }
       if (!response.url) {
-        reject(new Error("ImageKit uploaded the image but did not return its URL."));
+        reject(new Error("ImageKit uploaded the file but did not return its URL."));
         return;
       }
       resolve({ url: response.url, fileId: response.fileId });
@@ -39,3 +39,5 @@ export async function uploadImageToImageKit(file, folder, onProgress) {
     request.send(formData);
   });
 }
+
+export const uploadImageToImageKit = uploadFileToImageKit;

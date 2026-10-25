@@ -16,5 +16,5 @@ export async function createComment({ postId, user, text }) {
   if (!post) throw httpError(404, "Post not found.");
   const comment = await Comment.create({ post: post._id, author: user._id, text });
   await createNotification({ recipient: post.author, actor: user._id, type: NOTIFICATION_TYPES.COMMENT, message: `${user.name} commented on your post.`, post: post._id });
-  return { id: String(comment._id), name: user.name, text: comment.text, createdAt: comment.createdAt };
+  return { id: String(comment._id), name: user.name, photo: user.photo || "", text: comment.text, createdAt: comment.createdAt };
 }

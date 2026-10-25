@@ -31,6 +31,10 @@ export function toPublicUser(user) {
     bio: user.bio,
     skills: user.skills,
     photo: user.photo,
+    banner: user.banner,
+    projects: user.projects || [],
+    education: user.education || [],
+    featured: user.featured || [],
     portfolioUrl: user.portfolioUrl,
     createdAt: user.createdAt,
   };

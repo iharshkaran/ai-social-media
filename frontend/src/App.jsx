@@ -7,6 +7,7 @@ import Explore from "./pages/Explore";
 import Messages from "./pages/Messages";
 import Notifications from "./pages/Notifications";
 import Connections from "./pages/Connections";
+import PostDetail from "./pages/PostDetail";
 import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./context/useAuth";
 
@@ -33,6 +34,7 @@ function AppRoutes() {
       <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/profile/:id" element={<ProtectedRoute><PublicProfile /></ProtectedRoute>} />
+      <Route path="/post/:id" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
       <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
       <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
       <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />

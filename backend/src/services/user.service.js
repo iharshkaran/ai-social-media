@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import User from "../models/User.js";
+import Post from "../models/Post.js";
 import Follow from "../models/Follow.js";
 import { httpError } from "../utils/httpError.js";
 
@@ -8,7 +9,7 @@ export function toPublicProfile(user) {
     id: String(user._id), name: user.name, headline: user.headline,
     university: user.university, course: user.course, year: user.year,
     location: user.location, bio: user.bio, skills: user.skills,
-    photo: user.photo, portfolioUrl: user.portfolioUrl,
+    photo: user.photo, banner: user.banner, projects: user.projects || [], education: user.education || [], featured: user.featured || [], portfolioUrl: user.portfolioUrl,
   };
 }
 
@@ -35,6 +36,22 @@ export async function getStudentById(id) {
 }
 
 export async function updateProfile(user, updates) {
+  const projects = updates.projects ?? user.projects ?? [];
+  const projectKeys = new Set(projects.map((project) => String(project.key || project._id || "")));
+  const featuredProjects = (updates.featured ?? user.featured ?? []).filter((item) => item.type === "project");
+  if (featuredProjects.some((item) => !projectKeys.has(String(item.projectKey)))) {
+    throw httpError(400, "Featured project must belong to this profile.");
+  }
+
+  const relatedPostIds = [
+    ...(updates.projects ?? []).flatMap((project) => project.relatedPostIds || []),
+    ...(updates.featured ?? []).filter((item) => item.type === "post").map((item) => item.postId),
+  ];
+  const uniquePostIds = [...new Set(relatedPostIds.map(String))];
+  if (uniquePostIds.length) {
+    const ownedPosts = await Post.countDocuments({ _id: { $in: uniquePostIds }, author: user._id });
+    if (ownedPosts !== uniquePostIds.length) throw httpError(400, "Related posts must be your own posts.");
+  }
   Object.assign(user, updates);
   await user.save();
   return user;
