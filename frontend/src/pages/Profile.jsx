@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Camera,
@@ -46,7 +46,54 @@ function createKey() {
   return globalThis.crypto?.randomUUID?.() || `orbitu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function cropImageFile(file, aspectRatio, { x, y, zoom }) {
+function drawImageCrop(context, image, width, height, { x, y, zoom }) {
+  const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight) * zoom;
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  const offsetX = -(drawWidth - width) * (x / 100);
+  const offsetY = -(drawHeight - height) * (y / 100);
+  context.clearRect(0, 0, width, height);
+  context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+}
+
+function CropPreview({ crop }) {
+  const canvasRef = useRef(null);
+  const imageRef = useRef(null);
+  const cropRef = useRef(crop);
+  cropRef.current = crop;
+
+  function redraw(image = imageRef.current) {
+    const canvas = canvasRef.current;
+    if (!canvas || !image) return;
+    const currentCrop = cropRef.current;
+    const aspectRatio = currentCrop.target === "photo" ? 1 : 3.2;
+    const width = 600;
+    const height = Math.round(width / aspectRatio);
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (context) drawImageCrop(context, image, width, height, currentCrop);
+  }
+
+  useEffect(() => {
+    const image = new Image();
+    image.onload = () => {
+      imageRef.current = image;
+      redraw(image);
+    };
+    image.src = crop.preview;
+    return () => {
+      image.onload = null;
+      imageRef.current = null;
+    };
+  }, [crop.preview]);
+
+  useEffect(() => { redraw(); }, [crop.x, crop.y, crop.zoom, crop.target]);
+
+  return <canvas ref={canvasRef} aria-label="Image crop preview" role="img" className="block h-full w-full" />;
+}
+
+function cropImageFile(file, aspectRatio, crop) {
   return new Promise((resolve, reject) => {
     const image = new Image();
     const sourceUrl = URL.createObjectURL(file);
@@ -54,17 +101,12 @@ function cropImageFile(file, aspectRatio, { x, y, zoom }) {
       URL.revokeObjectURL(sourceUrl);
       const width = 1200;
       const height = Math.round(width / aspectRatio);
-      const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight) * zoom;
-      const drawWidth = image.naturalWidth * scale;
-      const drawHeight = image.naturalHeight * scale;
-      const offsetX = -(drawWidth - width) * (x / 100);
-      const offsetY = -(drawHeight - height) * (y / 100);
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
       const context = canvas.getContext("2d");
       if (!context) { reject(new Error("Could not prepare this image. Please try another one.")); return; }
-      context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+      drawImageCrop(context, image, width, height, crop);
       canvas.toBlob((blob) => {
         if (!blob) { reject(new Error("Could not crop this image. Please try again.")); return; }
         resolve(new File([blob], `orbitu-${Date.now()}.jpg`, { type: "image/jpeg" }));
@@ -73,26 +115,6 @@ function cropImageFile(file, aspectRatio, { x, y, zoom }) {
     image.onerror = () => { URL.revokeObjectURL(sourceUrl); reject(new Error("Could not open this image. Please try another one.")); };
     image.src = sourceUrl;
   });
-}
-
-function getCropPreviewStyle(crop) {
-  if (!crop.naturalWidth || !crop.naturalHeight) {
-    return { height: "100%", width: "100%", objectFit: "cover", objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` };
-  }
-
-  const frameAspect = crop.target === "photo" ? 1 : 3.2;
-  const sourceAspect = crop.naturalWidth / crop.naturalHeight;
-  const widthFactor = Math.max(1, sourceAspect / frameAspect) * crop.zoom;
-  const heightFactor = Math.max(1, frameAspect / sourceAspect) * crop.zoom;
-
-  return {
-    position: "absolute",
-    left: `${-(widthFactor - 1) * crop.x}%`,
-    top: `${-(heightFactor - 1) * crop.y}%`,
-    width: `${widthFactor * 100}%`,
-    height: `${heightFactor * 100}%`,
-    maxWidth: "none",
-  };
 }
 
 function Profile() {
@@ -184,7 +206,7 @@ function Profile() {
     }
 
     setPhotoError("");
-    setImageCrop({ file, preview: URL.createObjectURL(file), target, x: 50, y: 50, zoom: 1 });
+    setImageCrop({ file, preview: URL.createObjectURL(file), target, x: 50, y: 50, zoom: target === "photo" ? 1.2 : 1 });
   }
 
   async function applyImageCrop() {
@@ -334,7 +356,7 @@ function Profile() {
 
             {editing && imageCrop && <section className="mt-6 rounded-2xl border-2 border-[#191a32] bg-[#fffdf9] p-4 shadow-[3px_4px_0_#c9bcff] sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold">Adjust {imageCrop.target === "photo" ? "profile photo" : "banner"}</h2><p className="mt-1 text-xs text-[#6e6a7b]">Move and zoom the image until it fits the frame.</p></div><button type="button" onClick={cancelImageCrop} className="rounded-lg p-1 text-[#6e6a7b] hover:bg-[#f4f0e8]" aria-label="Cancel image adjustment"><X size={18} /></button></div>
-              <div className={`relative mx-auto mt-4 overflow-hidden rounded-2xl border-2 border-[#191a32] bg-[#e7dfd0] ${imageCrop.target === "photo" ? "aspect-square w-48" : "aspect-[3.2/1] w-full"}`}><img src={imageCrop.preview} alt="Image crop preview" onLoad={(event) => { const { naturalWidth, naturalHeight } = event.currentTarget; setImageCrop((current) => current?.preview === imageCrop.preview ? { ...current, naturalWidth, naturalHeight } : current); }} className="h-full w-full" style={getCropPreviewStyle(imageCrop)} /></div>
+              <div className={`relative mx-auto mt-4 overflow-hidden rounded-2xl border-2 border-[#191a32] bg-[#e7dfd0] ${imageCrop.target === "photo" ? "aspect-square w-48" : "aspect-[3.2/1] w-full"}`}><CropPreview crop={imageCrop} /></div>
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <label className="text-xs font-medium text-[#514e62]">Horizontal position<input type="range" min="0" max="100" value={imageCrop.x} onChange={(event) => setImageCrop((current) => ({ ...current, x: Number(event.target.value) }))} className="mt-2 block w-full accent-[#6f56d9]" /></label>
                 <label className="text-xs font-medium text-[#514e62]">Vertical position<input type="range" min="0" max="100" value={imageCrop.y} onChange={(event) => setImageCrop((current) => ({ ...current, y: Number(event.target.value) }))} className="mt-2 block w-full accent-[#6f56d9]" /></label>
