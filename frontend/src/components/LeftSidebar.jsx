@@ -20,7 +20,7 @@ function LeftSidebar() {
             try {
                 const [posts, network] = await Promise.all([useConnectlyStore.getState().loadPosts(), useConnectlyStore.getState().loadConnections()]);
                 if (active) {
-                    setPostCount(posts.filter((post) => post.authorId === user?.id).length);
+                    setPostCount(useConnectlyStore.getState().ownPostCount ?? posts.filter((post) => post.authorId === user?.id).length);
                     setConnectionCount(network.connected.length);
                 }
             } catch {
@@ -41,7 +41,7 @@ function LeftSidebar() {
 
                 <div className="-mt-10 px-5 pb-5">
                     <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border-4 border-[#1b1b1b] bg-[#303030] text-yellow-400">
-                        {profile.photo ? <img src={profile.photo} alt={`${name}'s profile`} className="h-full w-full object-cover" /> : <GraduationCap size={30} />}
+                        {profile.photo ? <img src={profile.photo} alt={`${name}'s profile`} decoding="async" className="h-full w-full object-cover" /> : <GraduationCap size={30} />}
                     </div>
 
                     <h2 className="mt-3 text-lg font-semibold">{name}</h2>

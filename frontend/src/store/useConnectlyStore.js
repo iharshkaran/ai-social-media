@@ -34,6 +34,9 @@ export const useConnectlyStore = create((set, get) => ({
   notificationsAt: 0,
   posts: null,
   postsAt: 0,
+  postsPage: 0,
+  postsHasMore: false,
+  ownPostCount: null,
   studentsByQuery: {},
 
   loadConnections: (force = false) => loadCached({
@@ -66,19 +69,47 @@ export const useConnectlyStore = create((set, get) => ({
     onSuccess: (notifications) => set({ notifications, notificationsAt: Date.now() }),
   }),
 
-  loadPosts: (force = false) => loadCached({
-    key: "posts",
-    cachedValue: get().posts,
-    cachedAt: get().postsAt,
-    ttl: TTL.posts,
-    force,
-    fetcher: api.posts,
-    onSuccess: (posts) => set({ posts, postsAt: Date.now() }),
-  }),
+  loadPosts: async (force = false) => {
+    const result = await loadCached({
+      key: "posts",
+      cachedValue: get().posts,
+      cachedAt: get().postsAt,
+      ttl: TTL.posts,
+      force,
+      fetcher: () => api.posts(1, 10),
+      onSuccess: ({ data, page, hasMore, ownPostCount }) => set({
+        posts: data,
+        postsAt: Date.now(),
+        postsPage: page,
+        postsHasMore: hasMore,
+        ownPostCount,
+      }),
+    });
+    return Array.isArray(result) ? result : result.data;
+  },
 
-  loadStudents: (query = "", force = false) => {
+  loadMorePosts: async () => {
+    if (!get().postsHasMore) return [];
+    const page = get().postsPage + 1;
+    const result = await loadCached({
+      key: `posts:${page}`,
+      cachedValue: null,
+      cachedAt: 0,
+      ttl: TTL.posts,
+      force: false,
+      fetcher: () => api.posts(page, 10),
+      onSuccess: ({ data, hasMore }) => set((state) => {
+        const existingIds = new Set((state.posts || []).map((post) => post.id));
+        const nextPosts = [...(state.posts || []), ...data.filter((post) => !existingIds.has(post.id))];
+        return { posts: nextPosts, postsAt: Date.now(), postsPage: page, postsHasMore: hasMore };
+      }),
+    });
+    return result.data;
+  },
+
+  loadStudents: (query = "", force = false, page = 1) => {
     const normalizedQuery = query.trim();
-    const key = `students:${normalizedQuery.toLowerCase()}`;
+    const key = `students:${normalizedQuery.toLowerCase()}:${page}`;
     const cached = get().studentsByQuery[key];
     return loadCached({
       key,
@@ -86,9 +117,9 @@ export const useConnectlyStore = create((set, get) => ({
       cachedAt: cached?.updatedAt ?? 0,
       ttl: TTL.students,
       force,
-      fetcher: () => api.users(normalizedQuery),
-      onSuccess: (students) => set((state) => ({
-        studentsByQuery: { ...state.studentsByQuery, [key]: { data: students, updatedAt: Date.now() } },
+      fetcher: () => api.users(normalizedQuery, page, 12),
+      onSuccess: (result) => set((state) => ({
+        studentsByQuery: { ...state.studentsByQuery, [key]: { data: result, updatedAt: Date.now() } },
       })),
     });
   },

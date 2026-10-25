@@ -17,10 +17,15 @@ import {
 
 const filters = ["All", "B.Tech CSE", "B.Tech IT", "BCA", "B.Tech AI/ML"];
 const colors = ["bg-blue-500/20 text-blue-300", "bg-pink-500/20 text-pink-300", "bg-purple-500/20 text-purple-300", "bg-yellow-500/20 text-yellow-300", "bg-green-500/20 text-green-300", "bg-orange-500/20 text-orange-300"];
-async function loadExploreData(query = "", force = false) {
-  const [people, network] = await Promise.all([useConnectlyStore.getState().loadStudents(query, force), useConnectlyStore.getState().loadConnections(force)]);
-  const students = people.map((person, index) => ({ ...person, id: String(person.id), initials: person.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2), college: person.university || "University not added", course: person.course || person.headline || "Student", year: person.year || "", location: person.location || "", skills: person.skills || [], color: colors[index % colors.length] }));
-  return { students, network };
+const emptyConnections = { incoming: [], outgoing: [], connected: [] };
+
+async function loadExploreData(query = "", force = false, page = 1) {
+  const [result, network] = await Promise.all([
+    useConnectlyStore.getState().loadStudents(query, force, page),
+    page === 1 ? useConnectlyStore.getState().loadConnections(force) : Promise.resolve(useConnectlyStore.getState().connections || emptyConnections),
+  ]);
+  const students = result.data.map((person, index) => ({ ...person, id: String(person.id), initials: person.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2), college: person.university || "University not added", course: person.course || person.headline || "Student", year: person.year || "", location: person.location || "", skills: person.skills || [], color: colors[((page - 1) * 12 + index) % colors.length] }));
+  return { students, network, page: result.page, hasMore: result.hasMore };
 }
 
 export default function Explore() {
@@ -30,28 +35,46 @@ export default function Explore() {
   const [students, setStudents] = useState([]);
   const [connections, setConnections] = useState({ incoming: [], outgoing: [], connected: [] });
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
 
-  async function refreshData(force = false) {
+  async function refreshConnections() {
     try {
-      const { students: people, network } = await loadExploreData(search, force);
-      setStudents(people);
+      const network = await useConnectlyStore.getState().loadConnections(true);
       setConnections(network);
       setError("");
     } catch (requestError) { setError(requestError.message); }
-    finally { setLoading(false); }
   }
 
   useEffect(() => {
     let active = true;
     const load = () => {
-      loadExploreData(search).then(({ students: people, network }) => { if (active) { setStudents(people); setConnections(network); setError(""); } }).catch((requestError) => { if (active) setError(requestError.message); }).finally(() => { if (active) setLoading(false); });
+      loadExploreData(search, false, 1).then(({ students: people, network, hasMore: more }) => { if (active) { setStudents(people); setConnections(network); setHasMore(more); setError(""); } }).catch((requestError) => { if (active) setError(requestError.message); }).finally(() => { if (active) setLoading(false); });
     };
     const initialTimer = window.setTimeout(load, 250);
-    const refreshTimer = window.setInterval(load, 20000);
+    const refreshTimer = window.setInterval(() => {
+      useConnectlyStore.getState().loadConnections(true).then((network) => { if (active) setConnections(network); }).catch(() => {});
+    }, 20000);
     return () => { active = false; window.clearTimeout(initialTimer); window.clearInterval(refreshTimer); };
   }, [search]);
+
+  async function loadMoreStudents() {
+    setLoadingMore(true);
+    setError("");
+    try {
+      const { students: nextStudents, hasMore: more, page: loadedPage } = await loadExploreData(search, false, page + 1);
+      setStudents((current) => {
+        const existingIds = new Set(current.map((student) => student.id));
+        return [...current, ...nextStudents.filter((student) => !existingIds.has(student.id))];
+      });
+      setPage(loadedPage);
+      setHasMore(more);
+    } catch (requestError) { setError(requestError.message); }
+    finally { setLoadingMore(false); }
+  }
 
   const filteredStudents = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -69,7 +92,7 @@ export default function Explore() {
       const existing = connections.outgoing.find((request) => request.studentId === studentId);
       if (existing) await api.removeConnection(existing.id);
       else await api.requestConnection(studentId);
-      await refreshData(true);
+      await refreshConnections();
       window.dispatchEvent(new Event("connectly:backend-update"));
     } catch (requestError) { setError(requestError.message); }
     finally { setBusyId(""); }
@@ -80,7 +103,7 @@ export default function Explore() {
     setError("");
     try {
       await api.respondConnection(request.id, accept ? "accept" : "reject");
-      await refreshData(true);
+      await refreshConnections();
       window.dispatchEvent(new Event("connectly:backend-update"));
     } catch (requestError) { setError(requestError.message); }
     finally { setBusyId(""); }
@@ -138,7 +161,13 @@ export default function Explore() {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setLoading(true);
+                setStudents([]);
+                setPage(1);
+                setHasMore(false);
+              }}
               placeholder="Search students, colleges or skills..."
               className="w-full rounded-xl border border-white/10 bg-[#202020] py-3 pl-12 pr-4 text-sm outline-none transition placeholder:text-gray-600 focus:border-yellow-400"
             />
@@ -164,7 +193,7 @@ export default function Explore() {
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Students you may know</h2>
           <span className="text-sm text-gray-500">
-            {filteredStudents.length} students
+            {filteredStudents.length} students shown
           </span>
         </div>
 
@@ -267,9 +296,9 @@ export default function Explore() {
               size={36}
               className="mx-auto mb-4 text-gray-600"
             />
-            <h3 className="text-lg font-semibold">No students found</h3>
+            <h3 className="text-lg font-semibold">{hasMore ? "No matches in this batch" : "No students found"}</h3>
             <p className="mt-2 text-sm text-gray-500">
-              Try another name, college or skill.
+              {hasMore ? "Load more students or try another filter." : "Try another name, college or skill."}
             </p>
             <button
               onClick={() => {
@@ -279,6 +308,19 @@ export default function Explore() {
               className="mt-5 text-sm font-medium text-yellow-400 hover:text-yellow-300"
             >
               Clear filters
+            </button>
+          </div>
+        )}
+
+        {!loading && hasMore && (
+          <div className="mt-7 flex justify-center">
+            <button
+              type="button"
+              onClick={loadMoreStudents}
+              disabled={loadingMore}
+              className="rounded-xl border border-white/10 px-5 py-3 text-sm font-medium text-gray-300 transition hover:border-yellow-400 hover:text-yellow-300 disabled:cursor-wait disabled:opacity-50"
+            >
+              {loadingMore ? "Loading students…" : "Load more students"}
             </button>
           </div>
         )}

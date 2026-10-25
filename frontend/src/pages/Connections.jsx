@@ -102,7 +102,7 @@ export default function Connections() {
               {filteredItems.map((person) => (
                 <article key={person.id} className="flex flex-wrap items-center gap-3 px-4 py-4 sm:px-5">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold ${activeTab === "connections" ? "bg-green-400/10 text-green-300" : "bg-yellow-400/10 text-yellow-300"}`}>
-                    {person.photo ? <img src={person.photo} alt="" className="h-full w-full object-cover" /> : person.initials || person.name.split(" ").map((part) => part[0]).join("")}
+                    {person.photo ? <img src={person.photo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : person.initials || person.name.split(" ").map((part) => part[0]).join("")}
                   </div>
                   <div className="min-w-0 flex-1">
                     <h2 className="truncate text-sm font-semibold">{person.name}</h2>

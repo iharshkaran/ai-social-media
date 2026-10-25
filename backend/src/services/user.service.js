@@ -21,8 +21,10 @@ export async function findStudents({ currentUserId, query = "", page = 1, limit 
     const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     filter.$or = ["name", "university", "course", "skills"].map((field) => ({ [field]: { $regex: escapedTerm, $options: "i" } }));
   }
-  const users = await User.find(filter).sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit);
-  return { users: users.map(toPublicProfile), page: safePage, hasMore: users.length === safeLimit };
+  const fetchedUsers = await User.find(filter).sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit + 1);
+  const hasMore = fetchedUsers.length > safeLimit;
+  const users = fetchedUsers.slice(0, safeLimit);
+  return { users: users.map(toPublicProfile), page: safePage, hasMore };
 }
 
 export async function getStudentById(id) {

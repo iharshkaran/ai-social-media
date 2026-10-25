@@ -5,6 +5,12 @@
 2. Copy `.env.example` to `.env` and set `MONGODB_URI`, a random `JWT_SECRET` of at least 24 characters, and your ImageKit public/private keys. The backend loads this `.env` from its own folder, regardless of the terminal's current directory.
 3. Start the API with `npm run dev` (port 8000 by default).
 
+## Demo students
+Run `npm run seed:students` from this folder in development to add 24 fake student profiles for Explore pagination. It only inserts missing `@demo.connectly.test` accounts and does not overwrite existing records. Seeded accounts share the password `DemoStudent123!`.
+
+## Legacy image migration
+Run `npm run migrate:images` first to count profile photos and post images still stored as base64. It performs no changes. After reviewing the counts, run `npm run migrate:images -- --apply` to upload them to ImageKit and replace each database value only after its upload succeeds. The migration is repeatable; changed or already-migrated records are left alone. Do not run with a production database unless you intentionally add `--allow-production`.
+
 ## Structure
 - `src/app.js` configures middleware and mounts route modules only.
 - `src/routes/` maps HTTP endpoints to middleware and controllers.

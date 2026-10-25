@@ -25,7 +25,7 @@ function RightSidebar() {
           {students.map((student) => (
             <div key={student.id} className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08] font-semibold text-yellow-400">
-                {student.photo ? <img src={student.photo} alt="" className="h-full w-full rounded-full object-cover" /> : student.name.charAt(0)}
+                {student.photo ? <img src={student.photo} alt="" loading="lazy" decoding="async" className="h-full w-full rounded-full object-cover" /> : student.name.charAt(0)}
               </div>
 
               <div className="min-w-0 flex-1">

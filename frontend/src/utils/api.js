@@ -1,6 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
-async function request(path, options = {}) {
+async function request(path, options = {}, includeMetadata = false) {
   const response = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...options.headers },
@@ -8,7 +8,7 @@ async function request(path, options = {}) {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.message || "Could not connect to Connectly. Please try again.");
-  return body.data ?? body;
+  return includeMetadata ? body : body.data ?? body;
 }
 
 export const api = {
@@ -21,14 +21,18 @@ export const api = {
     const profile = Object.fromEntries(fields.filter((field) => field in payload).map((field) => [field, payload[field]]));
     return request("/users/me", { method: "PATCH", body: JSON.stringify(profile) });
   },
-  users: (query = "") => request(`/users${query ? `?q=${encodeURIComponent(query)}` : ""}`),
+  users: (query = "", page = 1, limit = 12) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (query) params.set("q", query);
+    return request(`/users?${params.toString()}`, {}, true);
+  },
   user: (id) => request(`/users/${encodeURIComponent(id)}`),
   userPosts: (id) => request(`/users/${encodeURIComponent(id)}/posts`),
   connections: () => request("/connections"),
   requestConnection: (id) => request(`/users/${id}/connections`, { method: "POST" }),
   respondConnection: (id, action) => request(`/connections/${id}`, { method: "PATCH", body: JSON.stringify({ action }) }),
   removeConnection: (id) => request(`/connections/${id}`, { method: "DELETE" }),
-  posts: () => request("/posts"),
+  posts: (page = 1, limit = 10) => request(`/posts?page=${page}&limit=${limit}`, {}, true),
   createPost: (payload) => request("/posts", { method: "POST", body: JSON.stringify(payload) }),
   deletePost: (id) => request(`/posts/${id}`, { method: "DELETE" }),
   toggleLike: (id) => request(`/posts/${id}/like`, { method: "POST" }),

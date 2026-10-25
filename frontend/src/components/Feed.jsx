@@ -48,16 +48,40 @@ function Feed() {
   const [likedPosts, setLikedPosts] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const imageInputRef = useRef(null);
 
   useEffect(() => {
     let active = true;
     useConnectlyStore.getState().loadPosts()
-      .then((items) => { if (active) { setPosts(items); setLikedPosts(items.filter((post) => post.liked).map((post) => post.id)); } })
+      .then((items) => { if (active) { setPosts(items); setHasMore(useConnectlyStore.getState().postsHasMore); setLikedPosts(items.filter((post) => post.liked).map((post) => post.id)); } })
       .catch((requestError) => { if (active) setError(requestError.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
+
+  async function loadMorePosts() {
+    setLoadingMore(true);
+    setError("");
+    try {
+      const nextPosts = await useConnectlyStore.getState().loadMorePosts();
+      if (nextPosts.length) {
+        setPosts(useConnectlyStore.getState().posts || []);
+        setHasMore(useConnectlyStore.getState().postsHasMore);
+        setLikedPosts((current) => Array.from(new Set([
+          ...current,
+          ...nextPosts.filter((post) => post.liked).map((post) => post.id),
+        ])));
+      } else {
+        setHasMore(false);
+      }
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   function updatePosts(update) {
     setPosts((current) => {
@@ -338,7 +362,7 @@ function Feed() {
           >
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-yellow-400/10 font-semibold text-yellow-400">
-                {post.avatar ? <img src={post.avatar} alt={`${post.name}'s profile`} className="h-full w-full object-cover" /> : post.name.charAt(0)}
+                {post.avatar ? <img src={post.avatar} alt={`${post.name}'s profile`} loading="lazy" decoding="async" className="h-full w-full object-cover" /> : post.name.charAt(0)}
               </div>
 
               <div className="min-w-0 flex-1">
@@ -380,6 +404,8 @@ function Feed() {
               <img
                 src={post.image}
                 alt="Shared by a student"
+                loading="lazy"
+                decoding="async"
                 className="mt-4 max-h-[480px] w-full rounded-xl border border-white/10 object-contain"
               />
             )}
@@ -484,6 +510,19 @@ function Feed() {
           </article>
         );
       })}
+
+      {!loading && posts.length > 0 && hasMore && (
+        <div className="flex justify-center pb-2">
+          <button
+            type="button"
+            onClick={loadMorePosts}
+            disabled={loadingMore}
+            className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-gray-300 transition hover:border-yellow-400 hover:text-yellow-300 disabled:cursor-wait disabled:opacity-50"
+          >
+            {loadingMore ? "Loading posts…" : "Load more posts"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

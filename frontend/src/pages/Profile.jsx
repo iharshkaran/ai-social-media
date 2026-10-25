@@ -142,7 +142,7 @@ function Profile() {
               <div className="relative">
                 <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl border-4 border-[#1b1b1b] bg-[#303030] text-yellow-400">
                   {(editing ? draft.photo : profile.photo) ? (
-                    <img src={editing ? draft.photo : profile.photo} alt={`${profile.name}'s profile`} className="h-full w-full object-cover" />
+                    <img src={editing ? draft.photo : profile.photo} alt={`${profile.name}'s profile`} decoding="async" className="h-full w-full object-cover" />
                   ) : <GraduationCap size={42} />}
                 </div>
                 {editing && (

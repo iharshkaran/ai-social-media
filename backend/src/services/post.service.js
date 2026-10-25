@@ -24,7 +24,9 @@ export async function listPosts({ userId, authorId, page = 1, limit = 20 }) {
   const currentPage = Math.max(1, Number(page) || 1);
   const pageSize = Math.min(50, Math.max(1, Number(limit) || 20));
   const filter = authorId ? { author: authorId } : {};
-  const posts = await Post.find(filter).populate("author", AUTHOR_FIELDS).sort({ createdAt: -1 }).skip((currentPage - 1) * pageSize).limit(pageSize).lean();
+  const fetchedPosts = await Post.find(filter).populate("author", AUTHOR_FIELDS).sort({ createdAt: -1 }).skip((currentPage - 1) * pageSize).limit(pageSize + 1).lean();
+  const hasMore = fetchedPosts.length > pageSize;
+  const posts = fetchedPosts.slice(0, pageSize);
   const ids = posts.map((post) => post._id);
   const [comments, counts, userLikes] = await Promise.all([
     Comment.find({ post: { $in: ids } }).populate("author", "name photo").sort({ createdAt: 1 }).lean(),
@@ -43,7 +45,8 @@ export async function listPosts({ userId, authorId, page = 1, limit = 20 }) {
   return {
     posts: posts.map((post) => formatPost(post, { likes: countMap.get(String(post._id)) || 0, liked: likedIds.has(String(post._id)), comments: commentMap.get(String(post._id)) || [] })),
     page: currentPage,
-    hasMore: posts.length === pageSize,
+    hasMore,
+    ownPostCount: currentPage === 1 ? await Post.countDocuments({ author: userId }) : undefined,
   };
 }
 

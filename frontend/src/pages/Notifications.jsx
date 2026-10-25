@@ -111,7 +111,7 @@ export default function Notifications() {
             <div className="border-b border-white/[0.06] p-5"><h2 className="font-semibold">Connection requests <span className="ml-2 text-xs font-normal text-yellow-300">{connections.incoming.length} pending</span></h2></div>
             {connections.incoming.map((request) => (
               <article key={request.id} className="flex flex-wrap items-center gap-3 border-b border-white/[0.06] p-5 last:border-0">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-400/15 font-semibold text-pink-300">{request.photo ? <img src={request.photo} alt="" className="h-full w-full object-cover" /> : request.initials || request.name.slice(0, 1)}</div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-400/15 font-semibold text-pink-300">{request.photo ? <img src={request.photo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : request.initials || request.name.slice(0, 1)}</div>
                 <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{request.name}</p><p className="mt-1 text-sm text-gray-400">{request.role} would like to connect.</p></div>
                 <div className="flex gap-2">
                   <button type="button" disabled={busyId === request.id} onClick={() => respondToRequest(request, true)} className="rounded-lg bg-yellow-400 px-3 py-2 text-xs font-semibold text-black hover:bg-yellow-300 disabled:opacity-50">Accept</button>
@@ -128,7 +128,7 @@ export default function Notifications() {
             return (
               <article key={item.id} className={`flex gap-4 border-b border-white/[0.06] p-5 last:border-0 ${item.read ? "" : "bg-yellow-400/[0.04]"}`}>
                 <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-yellow-400/10 text-yellow-400">
-                  {item.photo ? <img src={item.photo} alt="" className="h-full w-full object-cover" /> : <Icon size={19} />}
+                  {item.photo ? <img src={item.photo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <Icon size={19} />}
                   {!item.read && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-yellow-400 ring-2 ring-[#1b1b1b]" />}
                 </div>
                 <div className="min-w-0 flex-1">

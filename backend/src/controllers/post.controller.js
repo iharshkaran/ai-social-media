@@ -2,7 +2,7 @@ import { createPost, deletePost, listPosts, togglePostLike } from "../services/p
 
 export async function getPosts(req, res) {
   const result = await listPosts({ userId: req.user._id, page: req.query.page, limit: req.query.limit });
-  return res.json({ success: true, data: result.posts, page: result.page, hasMore: result.hasMore });
+  return res.json({ success: true, data: result.posts, page: result.page, hasMore: result.hasMore, ownPostCount: result.ownPostCount });
 }
 
 export async function addPost(req, res) {
