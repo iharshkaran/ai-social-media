@@ -507,14 +507,14 @@ function AuthPage() {
                                         type="submit"
                                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 py-3.5 font-semibold text-black transition hover:bg-yellow-300"
                                     >
-                                        {mode === "login" ? "Login to Connectly" : "Create account"}
+                                        {mode === "login" ? "Login to OrbitU" : "Create account"}
                                         <ArrowRight size={18} />
                                     </button>
                                 </form>
 
                                 <p className="mt-7 text-center text-sm text-gray-400">
                                     {mode === "login"
-                                        ? "New to Connectly?"
+                                        ? "New to OrbitU?"
                                         : "Already have an account?"}{" "}
                                     <button
                                         type="button"
@@ -528,7 +528,7 @@ function AuthPage() {
                                 </p>
 
                                 <p className="mt-6 text-center text-xs leading-5 text-gray-500">
-                                    By continuing, you agree to Connectly's Terms of Service and
+                                    By continuing, you agree to OrbitU's Terms of Service and
                                     Privacy Policy.
                                 </p>
                             </>
@@ -707,7 +707,7 @@ function AuthPage() {
                                 </div>
 
                                 <p className="mt-7 text-sm font-semibold tracking-wider text-yellow-400">
-                                    WELCOME TO CONNECTLY
+                                    WELCOME TO ORBITU
                                 </p>
 
                                 <h2 className="mt-3 text-3xl font-bold">
@@ -718,8 +718,8 @@ function AuthPage() {
                                     {form.name
                                         ? `Welcome, ${form.name}! `
                                         : "Welcome! "}
-                                    Your profile setup is ready. Join your student community
-                                    is waiting for you.
+                                    Your profile setup is ready. Your student community is
+                                    waiting for you.
                                 </p>
 
                                 {notice && (
@@ -767,7 +767,7 @@ function AuthPage() {
                                     onClick={() => navigate("/home")}
                                     className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 py-3.5 font-semibold text-black transition hover:bg-yellow-300"
                                 >
-                                    Explore Connectly
+                                    Explore OrbitU
                                     <ArrowRight size={18} />
                                 </button>
 

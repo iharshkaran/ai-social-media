@@ -47,10 +47,24 @@ function Feed() {
   const [commentDrafts, setCommentDrafts] = useState({});
   const [likedPosts, setLikedPosts] = useState([]);
   const [error, setError] = useState("");
+  const [shareFeedback, setShareFeedback] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [deletingPost, setDeletingPost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const imageInputRef = useRef(null);
+  const shareFeedbackTimer = useRef(null);
+
+  useEffect(() => () => {
+    if (shareFeedbackTimer.current) window.clearTimeout(shareFeedbackTimer.current);
+  }, []);
+
+  function showShareFeedback(message) {
+    setShareFeedback(message);
+    if (shareFeedbackTimer.current) window.clearTimeout(shareFeedbackTimer.current);
+    shareFeedbackTimer.current = window.setTimeout(() => setShareFeedback(""), 4000);
+  }
 
   useEffect(() => {
     let active = true;
@@ -153,12 +167,22 @@ function Feed() {
   }
 
   async function deletePost(postId) {
-    const confirmed = window.confirm("Delete this post?");
-    if (!confirmed) return;
+    setPendingDeleteId(postId);
+  }
 
-    try { await api.deletePost(postId); } catch (requestError) { setError(requestError.message); return; }
+  async function confirmDeletePost() {
+    if (!pendingDeleteId || deletingPost) return;
+    setDeletingPost(true);
+    const postId = pendingDeleteId;
+    try { await api.deletePost(postId); } catch (requestError) {
+      setError(requestError.message);
+      setDeletingPost(false);
+      return;
+    }
     updatePosts((current) => current.filter((post) => post.id !== postId));
     setLikedPosts((current) => current.filter((id) => id !== postId));
+    setPendingDeleteId(null);
+    setDeletingPost(false);
     window.dispatchEvent(new Event("connectly:backend-update"));
   }
 
@@ -217,26 +241,56 @@ function Feed() {
   }
 
   async function sharePost(post) {
-    const shareText = `${post.name} on Connectly:\n${post.text}`;
+    const shareText = `${post.name} on OrbitU:\n${post.text}`;
 
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Connectly post", text: shareText });
+        await navigator.share({ title: "OrbitU post", text: shareText });
+        showShareFeedback("Post shared successfully.");
       } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareText);
-        window.alert("Post text copied!");
+        showShareFeedback("Post text copied to clipboard.");
       } else {
-        window.alert(shareText);
+        showShareFeedback("Sharing is not available in this browser.");
       }
     } catch (error) {
       if (error.name !== "AbortError") {
-        window.alert("Unable to share this post right now.");
+        showShareFeedback("Unable to share this post right now.");
       }
     }
   }
 
   return (
     <div className="space-y-5">
+      {shareFeedback && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-xl border border-white/10 bg-[#242424] px-4 py-3 text-center text-sm text-white shadow-2xl"
+        >
+          {shareFeedback}
+        </p>
+      )}
+      {pendingDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !deletingPost) setPendingDeleteId(null);
+        }}>
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-post-title"
+            aria-describedby="delete-post-description"
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#1b1b1b] p-5 shadow-2xl"
+          >
+            <h2 id="delete-post-title" className="text-lg font-semibold">Delete this post?</h2>
+            <p id="delete-post-description" className="mt-2 text-sm leading-6 text-gray-400">This post will be removed from your feed. This action cannot be undone.</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={deletingPost} onClick={() => setPendingDeleteId(null)} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-gray-300 transition hover:bg-white/5 disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={deletingPost} onClick={confirmDeletePost} className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-wait disabled:opacity-50">{deletingPost ? "Deleting…" : "Delete post"}</button>
+            </div>
+          </section>
+        </div>
+      )}
       {/* CREATE POST */}
       <section className="rounded-2xl border border-white/10 bg-[#1b1b1b] p-4 sm:p-5">
         <h2 className="font-semibold">Share with your community</h2>

@@ -118,7 +118,14 @@ export default function Navbar() {
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#111111]/95 text-white backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <button onClick={() => navigate("/home")} className="shrink-0 text-xl font-bold sm:text-2xl">
-          <span className="text-yellow-400">Connect</span>ly
+          <span className="flex items-center gap-2">
+            <svg aria-hidden="true" viewBox="0 0 32 32" className="h-7 w-7 text-yellow-400">
+              <ellipse cx="16" cy="16" rx="12" ry="6" transform="rotate(-32 16 16)" fill="none" stroke="currentColor" strokeWidth="2" />
+              <circle cx="16" cy="16" r="3.5" fill="currentColor" />
+              <circle cx="26" cy="9" r="2" fill="white" />
+            </svg>
+            <span><span className="text-yellow-400">Orbit</span>U</span>
+          </span>
         </button>
 
         <form onSubmit={handleSearch} className="hidden max-w-xs flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[#1b1b1b] px-3 py-2 md:flex">

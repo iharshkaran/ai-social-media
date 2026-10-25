@@ -30,7 +30,7 @@ function RightSidebar() {
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{student.name}</p>
-                <p className="truncate text-xs text-gray-400">{student.headline || student.course || "Connectly student"}</p>
+                <p className="truncate text-xs text-gray-400">{student.headline || student.course || "OrbitU student"}</p>
               </div>
 
               <button
@@ -45,7 +45,7 @@ function RightSidebar() {
           ))}
         </div>
 
-        {students.length === 0 && <p className="mt-4 text-xs text-gray-500">More students will appear here as they join Connectly.</p>}
+        {students.length === 0 && <p className="mt-4 text-xs text-gray-500">More students will appear here as they join OrbitU.</p>}
 
         <button onClick={() => navigate("/explore")} className="mt-5 flex items-center gap-1 text-sm text-yellow-400 hover:text-yellow-300">
           Discover students <ArrowUpRight size={15} />
@@ -70,7 +70,7 @@ function RightSidebar() {
 
       <footer className="px-2 text-xs leading-6 text-gray-500">
         About · Community Guidelines · Privacy
-        <p>© 2026 Connectly · Built for students</p>
+        <p>© 2026 OrbitU · Built for students</p>
       </footer>
     </div>
   );

@@ -92,7 +92,7 @@ export default function PublicProfile() {
               </div>
             </div>
             <h1 className="mt-5 text-2xl font-bold">{profile.name}</h1>
-            <p className="mt-1 text-sm text-gray-300">{profile.headline || "Connectly student"}</p>
+            <p className="mt-1 text-sm text-gray-300">{profile.headline || "OrbitU student"}</p>
             {(profile.course || profile.year || profile.university) && <p className="mt-3 flex items-center gap-2 text-sm text-gray-400"><GraduationCap size={16} className="shrink-0 text-yellow-400" /> {[profile.course, profile.year, profile.university].filter(Boolean).join(" · ")}</p>}
             {profile.location && <p className="mt-2 flex items-center gap-2 text-sm text-gray-400"><MapPin size={15} className="text-yellow-400" /> {profile.location}</p>}
             {profile.bio && <div className="mt-6 border-t border-white/10 pt-5"><h2 className="font-semibold">About</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-gray-400">{profile.bio}</p></div>}

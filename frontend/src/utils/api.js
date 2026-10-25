@@ -7,7 +7,7 @@ async function request(path, options = {}, includeMetadata = false) {
     ...options,
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.message || "Could not connect to Connectly. Please try again.");
+  if (!response.ok) throw new Error(body.message || "Could not connect to OrbitU. Please try again.");
   return includeMetadata ? body : body.data ?? body;
 }
 
