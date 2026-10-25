@@ -8,6 +8,7 @@ import Messages from "./pages/Messages";
 import Notifications from "./pages/Notifications";
 import Connections from "./pages/Connections";
 import PostDetail from "./pages/PostDetail";
+import CreatePost from "./pages/CreatePost";
 import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./context/useAuth";
 
@@ -32,6 +33,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={loading ? <SessionLoading /> : user ? <Navigate to="/home" replace /> : <AuthPage />} />
       <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+      <Route path="/create-post" element={<ProtectedRoute><CreatePost /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/profile/:id" element={<ProtectedRoute><PublicProfile /></ProtectedRoute>} />
       <Route path="/post/:id" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />

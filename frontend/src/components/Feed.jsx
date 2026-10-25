@@ -1,5 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import {
   ImagePlus,
@@ -36,7 +37,7 @@ const categoryColors = {
   Achievement: "text-[#28734d] bg-green-400/10",
 };
 
-function Feed() {
+function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreated }) {
   const { user } = useAuth();
   const [posts, setPosts] = useState([]);
   const [postText, setPostText] = useState("");
@@ -92,13 +93,17 @@ function Feed() {
   }
 
   useEffect(() => {
+    if (composerOnly) {
+      setLoading(false);
+      return undefined;
+    }
     let active = true;
     useConnectlyStore.getState().loadPosts()
       .then((items) => { if (active) { setPosts(items); setHasMore(useConnectlyStore.getState().postsHasMore); setLikedPosts(items.filter((post) => post.liked).map((post) => post.id)); } })
       .catch((requestError) => { if (active) setError(requestError.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [composerOnly]);
 
   async function loadMorePosts() {
     setLoadingMore(true);
@@ -197,7 +202,10 @@ function Feed() {
 
     try {
       const saved = await api.createPost({ text: postText.trim(), image, mediaUrl: media?.url || "", mediaType: media?.url ? media.type : "", mediaName: media?.url ? media.name : "", category });
-      updatePosts((current) => [saved, ...current]);
+      if (composerOnly) {
+        const cachedPosts = useConnectlyStore.getState().posts || [];
+        useConnectlyStore.getState().updateCachedPosts([saved, ...cachedPosts.filter((post) => post.id !== saved.id)]);
+      } else updatePosts((current) => [saved, ...current]);
       window.dispatchEvent(new Event("connectly:backend-update"));
     } catch (requestError) { setError(requestError.message); return; }
     setPostText("");
@@ -220,6 +228,7 @@ function Feed() {
     }
     if (videoInputRef.current) videoInputRef.current.value = "";
     if (pdfInputRef.current) pdfInputRef.current.value = "";
+    onPostCreated?.();
   }
 
   async function deletePost(postId) {
@@ -318,7 +327,7 @@ function Feed() {
 
   return (
     <div className="space-y-5">
-      {shareFeedback && (
+      {!composerOnly && shareFeedback && (
         <p
           role="status"
           aria-live="polite"
@@ -327,7 +336,7 @@ function Feed() {
           {shareFeedback}
         </p>
       )}
-      {pendingDeleteId && (
+      {!composerOnly && pendingDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={(event) => {
           if (event.target === event.currentTarget && !deletingPost) setPendingDeleteId(null);
         }}>
@@ -348,7 +357,7 @@ function Feed() {
         </div>
       )}
       {/* CREATE POST */}
-      <section className="rounded-[26px] border-2 border-[#191a32] bg-white p-3 shadow-[4px_5px_0_#191a32] sm:p-4">
+      <section id="feed-composer" className={`${hideComposerOnMobile ? "hidden sm:block " : ""}scroll-mt-24 rounded-[26px] border-2 border-[#191a32] bg-white p-3 shadow-[4px_5px_0_#191a32] sm:p-4`}>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-[#191a32] bg-[#ffe35b] text-[#5947a8]">
             {user?.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : <BookOpen size={20} />}
@@ -360,6 +369,7 @@ function Feed() {
         </div>
 
         <textarea
+          id="feed-post-text"
           ref={postTextareaRef}
           value={postText}
           onChange={updatePostText}
@@ -470,6 +480,7 @@ function Feed() {
       </section>
 
       {/* FEED POSTS */}
+      {!composerOnly && <>
       {loading && <section className="rounded-[26px] border-2 border-[#191a32] bg-white px-5 py-12 text-center text-sm text-[#6e6a7b] shadow-[3px_4px_0_#e7dfd0]">Loading your feed...</section>}
       {!loading && posts.length === 0 && !error && (
         <section className="rounded-[26px] border-2 border-[#191a32] bg-[#fffdf9] px-5 py-12 text-center shadow-[3px_4px_0_#e7dfd0]">
@@ -491,12 +502,12 @@ function Feed() {
             className="rounded-[26px] border-2 border-[#191a32] bg-white p-4 shadow-[3px_4px_0_#e7dfd0] sm:p-5"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eee9ff] font-semibold text-[#6f56d9]">
+              <Link to={post.authorId === user?.id ? "/profile" : `/profile/${post.authorId}`} aria-label={`Open ${post.name}'s profile`} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eee9ff] font-semibold text-[#6f56d9] transition hover:ring-2 hover:ring-[#7660dc]">
                 {post.avatar ? <img src={post.avatar} alt={`${post.name}'s profile`} loading="lazy" decoding="async" className="h-full w-full object-cover" /> : post.name.charAt(0)}
-              </div>
+              </Link>
 
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm font-semibold">{post.name}</h3>
+                <h3 className="truncate text-sm font-semibold"><Link to={post.authorId === user?.id ? "/profile" : `/profile/${post.authorId}`} className="hover:text-[#5947a8]">{post.name}</Link></h3>
                 <p className="mt-1 text-xs text-[#6e6a7b]">{post.role}</p>
                 <p className="mt-1 text-xs text-[#858191]">{post.time ? notificationTime(post.time) : "Just now"}</p>
               </div>
@@ -532,12 +543,12 @@ function Feed() {
                 alt="Shared by a student"
                 loading="lazy"
                 decoding="async"
-                className="mt-4 max-h-[480px] w-full rounded-xl border border-[#e7dfd0] object-contain"
+                className="mt-4 max-h-[560px] w-full rounded-xl border border-[#e7dfd0] object-contain sm:max-h-[620px]"
               />
             )}
 
             {post.mediaType === "video" && post.mediaUrl && (
-              <video src={post.mediaUrl} controls preload="metadata" className="mt-4 max-h-[480px] w-full rounded-xl border-2 border-[#191a32] bg-[#191a32]" />
+              <video src={post.mediaUrl} controls preload="metadata" className="mt-4 max-h-[560px] w-full rounded-xl border-2 border-[#191a32] bg-[#191a32] sm:max-h-[620px]" />
             )}
 
             {post.mediaType === "pdf" && post.mediaUrl && (
@@ -661,6 +672,7 @@ function Feed() {
           </button>
         </div>
       )}
+      </>}
     </div>
   );
 }

@@ -96,7 +96,7 @@ export default function Notifications() {
     <div className="min-h-screen orbit-pattern-bg text-[#17182d]">
       <Navbar />
       {error && <p role="alert" className="mx-auto max-w-3xl px-4 pt-4 text-sm text-[#a33b48] sm:px-6 lg:px-8">{error}</p>}
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-3xl px-4 py-8 pb-28 sm:px-6 lg:px-8">
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="text-3xl font-black tracking-[-0.04em] sm:text-4xl">A little good news?</h1>

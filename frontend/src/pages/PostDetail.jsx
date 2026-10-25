@@ -67,7 +67,7 @@ function PostDetail() {
   const profileLink = post?.authorId === user?.id ? "/profile" : `/profile/${post?.authorId}`;
   const hasMedia = Boolean(post?.image || post?.mediaUrl);
 
-  return <div className="min-h-screen orbit-pattern-bg text-[#17182d]"><Navbar /><main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+  return <div className="min-h-screen orbit-pattern-bg text-[#17182d]"><Navbar /><main className="mx-auto max-w-6xl px-4 py-6 pb-28 sm:px-6 lg:px-8">
     <Link to={profileLink} className="mb-5 inline-flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-[#514e62] hover:bg-white/70 hover:text-[#5947a8]"><ArrowLeft size={17} /> Back to profile</Link>
     {error && <p role="alert" className="mb-4 rounded-xl border border-red-400/20 bg-white px-4 py-3 text-sm text-[#a33b48]">{error}</p>}
     {loading ? <div className="rounded-[26px] border-2 border-[#191a32] bg-white p-12 text-center text-sm text-[#6e6a7b] shadow-[4px_5px_0_#c9bcff]">Loading post…</div> : post ? <article className="mx-auto grid max-w-6xl overflow-hidden rounded-[26px] border-2 border-[#191a32] bg-white shadow-[5px_6px_0_#c9bcff] lg:grid-cols-[3fr_2fr]">

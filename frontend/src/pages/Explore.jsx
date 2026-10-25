@@ -121,7 +121,7 @@ export default function Explore() {
       <Navbar />
       {error && <p role="alert" className="mx-auto max-w-7xl px-4 pt-4 text-sm text-[#a33b48] sm:px-6 lg:px-8">{error}</p>}
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 pb-28 sm:px-6 lg:px-8">
         <section className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="text-3xl font-black tracking-[-0.04em] sm:text-4xl">Find your kind of people.</h1>
@@ -219,11 +219,13 @@ export default function Explore() {
                   className="rounded-[26px] border-2 border-[#191a32] bg-white p-5 shadow-[3px_4px_0_#e7dfd0] transition duration-200 hover:-translate-y-1 hover:shadow-[5px_6px_0_#c9bcff]"
                 >
                   <div className="flex items-start justify-between">
-                    <div
-                      className={`flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-[#191a32] text-lg font-black ${student.color}`}
+                    <Link
+                      to={`/profile/${student.id}`}
+                      aria-label={`Open ${student.name}'s profile`}
+                      className={`relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border-2 border-[#191a32] text-lg font-black transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#7660dc]/30 ${student.color}`}
                     >
-                      {student.initials}
-                    </div>
+                      {student.photo ? <img src={student.photo} alt={`${student.name}'s profile`} loading="lazy" decoding="async" className="h-full w-full object-cover" /> : student.initials}
+                    </Link>
 
                     <span className="rounded-full border border-[#e7dfd0] bg-[#fffdf9] px-3 py-1 text-xs text-[#6e6a7b]">
                       {student.year}

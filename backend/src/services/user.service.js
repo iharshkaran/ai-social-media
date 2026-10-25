@@ -30,9 +30,12 @@ export async function findStudents({ currentUserId, query = "", page = 1, limit 
 
 export async function getStudentById(id) {
   if (!mongoose.isValidObjectId(id)) throw httpError(400, "Invalid student id.");
-  const user = await User.findById(id);
+  const [user, connectionCount] = await Promise.all([
+    User.findById(id),
+    Follow.countDocuments({ status: "accepted", $or: [{ from: id }, { to: id }] }),
+  ]);
   if (!user) throw httpError(404, "Student not found.");
-  return toPublicProfile(user);
+  return { ...toPublicProfile(user), connectionCount };
 }
 
 export async function updateProfile(user, updates) {

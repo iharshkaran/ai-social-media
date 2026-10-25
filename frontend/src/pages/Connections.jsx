@@ -72,7 +72,7 @@ export default function Connections() {
   return (
     <div className="min-h-screen orbit-pattern-bg text-[#17182d]">
       <Navbar />
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 lg:px-8">
         <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#6f56d9]">Your student network</p>
@@ -107,11 +107,11 @@ export default function Connections() {
             <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
               {filteredItems.map((person) => (
                 <article key={person.id} className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-[#191a32] bg-white p-4 shadow-[3px_4px_0_#c9bcff] transition hover:-translate-y-0.5 hover:shadow-[4px_5px_0_#87d4f4] sm:gap-4">
-                  <div className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-[#191a32] font-semibold shadow-[2px_2px_0_#191a32] ${activeTab === "connections" ? "bg-[#dff6eb] text-[#28734d]" : "bg-[#eee9ff] text-[#5947a8]"}`}>
+                  <Link to={`/profile/${person.studentId}`} aria-label={`Open ${person.name}'s profile`} className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-[#191a32] font-semibold shadow-[2px_2px_0_#191a32] transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#7660dc]/30 ${activeTab === "connections" ? "bg-[#dff6eb] text-[#28734d]" : "bg-[#eee9ff] text-[#5947a8]"}`}>
                     {person.photo ? <img src={person.photo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : person.initials || person.name.split(" ").map((part) => part[0]).join("")}
-                  </div>
+                  </Link>
                   <div className="min-w-0 flex-1">
-                    <h2 className="truncate font-bold">{person.name}</h2>
+                    <h2 className="truncate font-bold"><Link to={`/profile/${person.studentId}`} className="hover:text-[#5947a8]">{person.name}</Link></h2>
                     <p className="mt-1 truncate text-sm text-[#6e6a7b]">{person.role || person.course || person.headline || "OrbitU student"}</p>
                     <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${activeTab === "connections" ? "bg-[#e8f6ed] text-[#28734d]" : activeTab === "received" ? "bg-[#fff3c4] text-[#805d00]" : "bg-[#eee9ff] text-[#5947a8]"}`}>{activeTab === "connections" ? "Connected" : activeTab === "received" ? "Request received" : "Request sent"}</span>
                   </div>

@@ -89,6 +89,14 @@ function Profile() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoProgress, setPhotoProgress] = useState(0);
   const [imageCrop, setImageCrop] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState("");
+
+  useEffect(() => {
+    if (!photoPreview) return undefined;
+    const closeOnEscape = (event) => { if (event.key === "Escape") setPhotoPreview(""); };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [photoPreview]);
 
   useEffect(() => {
     let active = true;
@@ -258,7 +266,7 @@ function Profile() {
   return (
     <div className="min-h-screen orbit-pattern-bg text-[#17182d]">
       <Navbar />
-      <main className="px-4 py-8 sm:px-6">
+      <main className="px-4 py-8 pb-28 sm:px-6">
       <div className="mx-auto max-w-5xl">
         <section className="overflow-hidden rounded-[28px] border-2 border-[#191a32] bg-white shadow-[4px_5px_0_#c9bcff]">
           <div className="relative h-36 overflow-hidden bg-gradient-to-r from-[#c9bcff] via-[#ffafd0] to-[#87d4f4] sm:h-48">
@@ -269,11 +277,11 @@ function Profile() {
           <div className="px-5 pb-6 sm:px-8">
             <div className="-mt-12 flex flex-wrap items-end justify-between gap-4">
               <div className="relative">
-                <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-[28px] border-4 border-white bg-[#fff3b7] text-[#6f56d9] shadow-[0_0_0_2px_#191a32]">
-                  {(editing ? draft.photo : profile.photo) ? (
-                    <img src={editing ? draft.photo : profile.photo} alt={`${profile.name}'s profile`} decoding="async" className="h-full w-full object-cover" />
-                  ) : <GraduationCap size={42} />}
-                </div>
+                {editing ? <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-[30px] border-4 border-white bg-[#fff3b7] text-[#6f56d9] shadow-[0_0_0_2px_#191a32]">
+                  {draft.photo ? <img src={draft.photo} alt={`${profile.name}'s profile`} decoding="async" className="h-full w-full object-cover" /> : <GraduationCap size={46} />}
+                </div> : profile.photo ? <button type="button" onClick={() => setPhotoPreview(profile.photo)} aria-label="Preview profile photo" className="flex h-36 w-36 cursor-zoom-in items-center justify-center overflow-hidden rounded-[30px] border-4 border-white bg-[#fff3b7] text-[#6f56d9] shadow-[0_0_0_2px_#191a32] transition hover:shadow-[0_0_0_4px_#c9bcff] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#7660dc]/30">
+                  <img src={profile.photo} alt={`${profile.name}'s profile`} decoding="async" className="h-full w-full object-cover" />
+                </button> : <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-[30px] border-4 border-white bg-[#fff3b7] text-[#6f56d9] shadow-[0_0_0_2px_#191a32]"><GraduationCap size={46} /></div>}
                 {editing && (
                   <label htmlFor="profile-photo" className="absolute -bottom-2 -right-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-2xl border-2 border-[#191a32] bg-[#ffe35b] text-black shadow-[0_2px_0_#191a32]" title="Change profile photo">
                     <Camera size={16} />
@@ -610,6 +618,10 @@ function Profile() {
         </>}
       </div>
       </main>
+      {photoPreview && <div role="dialog" aria-modal="true" aria-label="Profile photo preview" onClick={() => setPhotoPreview("")} className="fixed inset-0 z-[100] flex items-center justify-center bg-[#111222]/85 p-5 backdrop-blur-sm">
+        <button type="button" onClick={() => setPhotoPreview("")} aria-label="Close profile photo preview" className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white transition hover:bg-white/20"><X size={22} /></button>
+        <img src={photoPreview} alt={`${profile.name}'s profile photo enlarged`} onClick={(event) => event.stopPropagation()} className="max-h-[76vh] max-w-[min(86vw,560px)] rounded-2xl border-2 border-white/80 object-contain shadow-2xl" />
+      </div>}
     </div>
   );
 }

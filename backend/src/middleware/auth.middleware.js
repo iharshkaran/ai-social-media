@@ -5,10 +5,11 @@ export const AUTH_COOKIE_NAME = "connectly_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function getSessionCookieOptions() {
+  const sameSite = process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === "production" ? "none" : "lax");
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production" || sameSite.toLowerCase() === "none",
+    sameSite: sameSite.toLowerCase(),
     path: "/",
     maxAge: SESSION_TTL_MS,
   };

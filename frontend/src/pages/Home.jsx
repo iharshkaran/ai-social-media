@@ -6,16 +6,16 @@ import RightSidebar from "../components/RightSidebar";
 
 function Home() {
   return (
-    <div className="flex h-screen min-h-0 flex-col overflow-hidden orbit-pattern-bg text-[#17182d]">
+    <div className="min-h-dvh orbit-pattern-bg text-[#17182d] lg:flex lg:h-screen lg:min-h-0 lg:flex-col lg:overflow-hidden">
       <Navbar />
 
-      <main className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 grid-cols-1 gap-5 overflow-hidden px-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)_290px]">
+      <main className="mx-auto w-full max-w-7xl px-4 py-4 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[260px_minmax(0,1fr)_290px] lg:gap-5 lg:overflow-hidden">
         <aside className="hidden min-h-0 overflow-hidden lg:block">
           <LeftSidebar />
         </aside>
 
-        <section aria-label="Home feed" className="orbit-feed-scroll min-h-0 min-w-0 overflow-y-auto overscroll-contain pb-2 pr-1">
-          <Feed />
+        <section aria-label="Home feed" className="orbit-feed-scroll min-w-0 pb-24 pr-1 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pb-2">
+          <Feed hideComposerOnMobile />
         </section>
 
         <aside className="hidden min-h-0 overflow-hidden lg:block">
