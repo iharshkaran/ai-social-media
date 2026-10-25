@@ -20,6 +20,8 @@ import { useConnectlyStore } from "../store/useConnectlyStore";
 import { uploadFileToImageKit } from "../utils/imagekitUpload";
 import { notificationTime } from "../utils/socialStore";
 import PostCaption from "./PostCaption";
+import PdfPreview from "./PdfPreview";
+import { removeRapidDuplicateComments } from "../utils/comments";
 
 const categories = [
   "General",
@@ -50,6 +52,7 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   const [mediaPreview, setMediaPreview] = useState("");
   const [openComments, setOpenComments] = useState([]);
   const [commentDrafts, setCommentDrafts] = useState({});
+  const [submittingComments, setSubmittingComments] = useState([]);
   const [likedPosts, setLikedPosts] = useState([]);
   const [error, setError] = useState("");
   const [shareFeedback, setShareFeedback] = useState("");
@@ -65,6 +68,7 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   const categoryMenuRef = useRef(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const shareFeedbackTimer = useRef(null);
+  const submittingCommentsRef = useRef(new Set());
 
   useEffect(() => () => {
     if (shareFeedbackTimer.current) window.clearTimeout(shareFeedbackTimer.current);
@@ -159,8 +163,8 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
       return;
     }
 
-    const sizeLimit = mediaType === "video" ? 50 * 1024 * 1024 : mediaType === "pdf" ? 10 * 1024 * 1024 : 2 * 1024 * 1024;
-    const sizeLabel = mediaType === "video" ? "50 MB" : mediaType === "pdf" ? "10 MB" : "2 MB";
+    const sizeLimit = mediaType === "video" ? 50 * 1024 * 1024 : mediaType === "pdf" ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    const sizeLabel = mediaType === "video" ? "50 MB" : mediaType === "pdf" ? "10 MB" : "5 MB";
     if (file.size > sizeLimit) {
       setError(`Choose a ${mediaType} smaller than ${sizeLabel}.`);
       event.target.value = "";
@@ -283,26 +287,30 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
     event.preventDefault();
     const text = (commentDrafts[postId] || "").trim();
 
-    if (!text) return;
+    if (!text || submittingCommentsRef.current.has(postId)) return;
 
-    let savedComment;
-    try { savedComment = await api.comment(postId, text); } catch (requestError) { setError(requestError.message); return; }
-    updatePosts((current) =>
-      current.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              comments: [
-                ...post.comments,
-                savedComment,
-              ],
-            }
-          : post
-      )
-    );
-
-    setCommentDrafts((current) => ({ ...current, [postId]: "" }));
-    window.dispatchEvent(new Event("connectly:backend-update"));
+    submittingCommentsRef.current.add(postId);
+    setSubmittingComments((current) => [...current, postId]);
+    try {
+      const savedComment = await api.comment(postId, text);
+      updatePosts((current) =>
+        current.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                comments: removeRapidDuplicateComments([...post.comments, savedComment]),
+              }
+            : post
+        )
+      );
+      setCommentDrafts((current) => ({ ...current, [postId]: "" }));
+      window.dispatchEvent(new Event("connectly:backend-update"));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      submittingCommentsRef.current.delete(postId);
+      setSubmittingComments((current) => current.filter((id) => id !== postId));
+    }
   }
 
   async function sharePost(post) {
@@ -494,7 +502,7 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
 
       {posts.map((post) => {
         const liked = likedPosts.includes(post.id) || post.liked;
-        const comments = Array.isArray(post.comments) ? post.comments : [];
+        const comments = removeRapidDuplicateComments(Array.isArray(post.comments) ? post.comments : []);
 
         return (
           <article
@@ -552,11 +560,7 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
             )}
 
             {post.mediaType === "pdf" && post.mediaUrl && (
-              <a href={post.mediaUrl} target="_blank" rel="noreferrer" className="mt-4 flex items-center gap-3 rounded-2xl border-2 border-[#191a32] bg-[#fff3b7] p-4 text-sm font-semibold text-[#17182d] shadow-[3px_4px_0_#191a32] transition hover:-translate-y-0.5">
-                <FileText size={22} className="shrink-0 text-[#6f56d9]" />
-                <span className="min-w-0 flex-1 truncate">{post.mediaName || "Open attached PDF"}</span>
-                <span className="text-xs text-[#5947a8]">View PDF ↗</span>
-              </a>
+              <PdfPreview url={post.mediaUrl} name={post.mediaName || "Shared document"} compact />
             )}
 
             <div className="mt-4 flex items-center justify-between border-b border-[#e7dfd0] pb-3 text-xs text-[#6e6a7b]">
@@ -649,9 +653,10 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
                   <button
                     type="submit"
                     aria-label="Send comment"
-                    className="rounded-xl bg-[#ffe35b] px-3 text-black hover:bg-[#f3d446]"
+                    disabled={!commentDrafts[post.id]?.trim() || submittingComments.includes(post.id)}
+                    className="rounded-xl bg-[#ffe35b] px-3 text-black hover:bg-[#f3d446] disabled:cursor-wait disabled:opacity-50"
                   >
-                    <Send size={17} />
+                    {submittingComments.includes(post.id) ? <span className="text-xs">…</span> : <Send size={17} />}
                   </button>
                 </form>
               </div>

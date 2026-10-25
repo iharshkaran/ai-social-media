@@ -75,6 +75,26 @@ function cropImageFile(file, aspectRatio, { x, y, zoom }) {
   });
 }
 
+function getCropPreviewStyle(crop) {
+  if (!crop.naturalWidth || !crop.naturalHeight) {
+    return { height: "100%", width: "100%", objectFit: "cover", objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` };
+  }
+
+  const frameAspect = crop.target === "photo" ? 1 : 3.2;
+  const sourceAspect = crop.naturalWidth / crop.naturalHeight;
+  const widthFactor = Math.max(1, sourceAspect / frameAspect) * crop.zoom;
+  const heightFactor = Math.max(1, frameAspect / sourceAspect) * crop.zoom;
+
+  return {
+    position: "absolute",
+    left: `${-(widthFactor - 1) * crop.x}%`,
+    top: `${-(heightFactor - 1) * crop.y}%`,
+    width: `${widthFactor * 100}%`,
+    height: `${heightFactor * 100}%`,
+    maxWidth: "none",
+  };
+}
+
 function Profile() {
   const { user, setUser } = useAuth();
   const [profile, setProfile] = useState(() => ({ ...defaultProfile, ...user }));
@@ -314,7 +334,7 @@ function Profile() {
 
             {editing && imageCrop && <section className="mt-6 rounded-2xl border-2 border-[#191a32] bg-[#fffdf9] p-4 shadow-[3px_4px_0_#c9bcff] sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold">Adjust {imageCrop.target === "photo" ? "profile photo" : "banner"}</h2><p className="mt-1 text-xs text-[#6e6a7b]">Move and zoom the image until it fits the frame.</p></div><button type="button" onClick={cancelImageCrop} className="rounded-lg p-1 text-[#6e6a7b] hover:bg-[#f4f0e8]" aria-label="Cancel image adjustment"><X size={18} /></button></div>
-              <div className={`mx-auto mt-4 overflow-hidden rounded-2xl border-2 border-[#191a32] bg-[#e7dfd0] ${imageCrop.target === "photo" ? "aspect-square w-48" : "aspect-[3.2/1] w-full"}`}><img src={imageCrop.preview} alt="Image crop preview" className="h-full w-full object-cover" style={{ objectPosition: `${imageCrop.x}% ${imageCrop.y}%`, transform: `scale(${imageCrop.zoom})` }} /></div>
+              <div className={`relative mx-auto mt-4 overflow-hidden rounded-2xl border-2 border-[#191a32] bg-[#e7dfd0] ${imageCrop.target === "photo" ? "aspect-square w-48" : "aspect-[3.2/1] w-full"}`}><img src={imageCrop.preview} alt="Image crop preview" onLoad={(event) => { const { naturalWidth, naturalHeight } = event.currentTarget; setImageCrop((current) => current?.preview === imageCrop.preview ? { ...current, naturalWidth, naturalHeight } : current); }} className="h-full w-full" style={getCropPreviewStyle(imageCrop)} /></div>
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <label className="text-xs font-medium text-[#514e62]">Horizontal position<input type="range" min="0" max="100" value={imageCrop.x} onChange={(event) => setImageCrop((current) => ({ ...current, x: Number(event.target.value) }))} className="mt-2 block w-full accent-[#6f56d9]" /></label>
                 <label className="text-xs font-medium text-[#514e62]">Vertical position<input type="range" min="0" max="100" value={imageCrop.y} onChange={(event) => setImageCrop((current) => ({ ...current, y: Number(event.target.value) }))} className="mt-2 block w-full accent-[#6f56d9]" /></label>

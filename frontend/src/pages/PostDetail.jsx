@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, FileText, Heart, MessageCircle, Send, Share2 } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Send, Share2 } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { api } from "../utils/api";
 import { useAuth } from "../context/useAuth";
 import { notificationTime } from "../utils/socialStore";
+import PdfPreview from "../components/PdfPreview";
+import { removeRapidDuplicateComments } from "../utils/comments";
 
 function PostDetail() {
   const { id } = useParams();
@@ -21,7 +23,7 @@ function PostDetail() {
     let active = true;
     setLoading(true);
     Promise.all([api.post(id), api.postComments(id)])
-      .then(([item, savedComments]) => { if (active) { setPost(item); setComments(savedComments); setError(""); } })
+      .then(([item, savedComments]) => { if (active) { setPost(item); setComments(removeRapidDuplicateComments(savedComments)); setError(""); } })
       .catch((requestError) => { if (active) setError(requestError.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -44,7 +46,7 @@ function PostDetail() {
     setBusy(true);
     try {
       const saved = await api.comment(post.id, text);
-      setComments((current) => [...current, saved]);
+      setComments((current) => removeRapidDuplicateComments([...current, saved]));
       setDraft("");
       window.dispatchEvent(new Event("connectly:backend-update"));
     } catch (requestError) { setError(requestError.message); }
@@ -73,7 +75,7 @@ function PostDetail() {
     {loading ? <div className="rounded-[26px] border-2 border-[#191a32] bg-white p-12 text-center text-sm text-[#6e6a7b] shadow-[4px_5px_0_#c9bcff]">Loading post…</div> : post ? <article className="mx-auto grid max-w-6xl overflow-hidden rounded-[26px] border-2 border-[#191a32] bg-white shadow-[5px_6px_0_#c9bcff] lg:grid-cols-[3fr_2fr]">
       <div className="flex min-w-0 flex-col border-b border-[#e7dfd0] lg:border-b-0 lg:border-r">
         <header className="flex items-center gap-3 border-b border-[#e7dfd0] p-4 sm:p-5"><Link to={profileLink} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#191a32] bg-[#eee9ff] font-bold text-[#5947a8]">{post.avatar ? <img src={post.avatar} alt="" className="h-full w-full object-cover" /> : post.name?.slice(0, 1)}</Link><div className="min-w-0 flex-1"><Link to={profileLink} className="block truncate text-sm font-bold hover:text-[#5947a8]">{post.name}</Link><p className="mt-0.5 truncate text-xs text-[#6e6a7b]">{post.role || "OrbitU student"}</p><p className="mt-1 text-[11px] text-[#858191]">{notificationTime(post.time)}</p></div><span className="rounded-full bg-[#eee9ff] px-3 py-1 text-[10px] font-bold text-[#5947a8]">{post.category || "General"}</span></header>
-        {hasMedia && <div className="flex min-h-64 flex-1 items-center justify-center bg-[#191a32] lg:min-h-[680px]">{post.image ? <img src={post.image} alt="Post attachment" className="max-h-[78vh] w-full object-contain" /> : post.mediaType === "video" ? <video src={post.mediaUrl} controls playsInline className="max-h-[78vh] w-full" /> : post.mediaType === "pdf" ? <div className="p-8 text-center text-white"><FileText size={48} className="mx-auto text-[#ffe35b]" /><p className="mt-4 max-w-sm break-words font-semibold">{post.mediaName || "Attached document"}</p><a href={post.mediaUrl} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#ffe35b] px-4 py-2.5 text-sm font-bold text-black">Open PDF <ExternalLink size={15} /></a></div> : null}</div>}
+        {hasMedia && (post.mediaType === "pdf" ? <div className="p-3 sm:p-5"><PdfPreview url={post.mediaUrl} name={post.mediaName || "Shared document"} /></div> : <div className="flex min-h-64 flex-1 items-center justify-center bg-[#191a32] lg:min-h-[680px]">{post.image ? <img src={post.image} alt="Post attachment" className="max-h-[78vh] w-full object-contain" /> : post.mediaType === "video" ? <video src={post.mediaUrl} controls playsInline className="max-h-[78vh] w-full" /> : null}</div>)}
         <div className="p-5 sm:p-7">{post.text ? <p className="whitespace-pre-wrap break-words text-sm leading-7 text-[#343247]">{post.text}</p> : !hasMedia ? <p className="rounded-2xl bg-[#fff9e8] p-5 text-xs text-[#858191]">A post shared with the OrbitU community.</p> : <p className="text-sm text-[#858191]">Shared with the OrbitU community.</p>}</div>
       </div>
       <div className="flex min-h-[560px] min-w-0 flex-col bg-[#fffdf9]">
