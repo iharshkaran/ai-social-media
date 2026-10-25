@@ -1,17 +1,21 @@
 
+import { useEffect, useState } from "react";
 import { UserPlus, TrendingUp, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const students = [
-  { name: "Riya Singh", course: "B.Tech · Web Development" },
-  { name: "Arjun Mehta", course: "B.Tech · DSA & C++" },
-  { name: "Neha Gupta", course: "BCA · UI/UX Design" },
-];
+import { useConnectlyStore } from "../store/useConnectlyStore";
 
 const topics = ["Web Development", "Hackathons", "Data Structures", "Internships"];
 
 function RightSidebar() {
   const navigate = useNavigate();
+  const [students, setStudents] = useState([]);
+  useEffect(() => {
+    let active = true;
+    const load = () => useConnectlyStore.getState().loadStudents().then((people) => { if (active) setStudents(people.slice(0, 3)); }).catch(() => {});
+    load();
+    window.addEventListener("connectly:backend-update", load);
+    return () => { active = false; window.removeEventListener("connectly:backend-update", load); };
+  }, []);
   return (
     <div className="space-y-5">
       <section className="rounded-2xl border border-white/10 bg-[#1b1b1b] p-5">
@@ -19,14 +23,14 @@ function RightSidebar() {
 
         <div className="mt-4 space-y-4">
           {students.map((student) => (
-            <div key={student.name} className="flex items-center gap-3">
+            <div key={student.id} className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08] font-semibold text-yellow-400">
-                {student.name.charAt(0)}
+                {student.photo ? <img src={student.photo} alt="" className="h-full w-full rounded-full object-cover" /> : student.name.charAt(0)}
               </div>
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{student.name}</p>
-                <p className="truncate text-xs text-gray-400">{student.course}</p>
+                <p className="truncate text-xs text-gray-400">{student.headline || student.course || "Connectly student"}</p>
               </div>
 
               <button
@@ -40,6 +44,8 @@ function RightSidebar() {
             </div>
           ))}
         </div>
+
+        {students.length === 0 && <p className="mt-4 text-xs text-gray-500">More students will appear here as they join Connectly.</p>}
 
         <button onClick={() => navigate("/explore")} className="mt-5 flex items-center gap-1 text-sm text-yellow-400 hover:text-yellow-300">
           Discover students <ArrowUpRight size={15} />

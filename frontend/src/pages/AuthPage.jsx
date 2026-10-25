@@ -1,5 +1,7 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../utils/api";
+import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
 import {
     GraduationCap,
@@ -58,6 +60,8 @@ const popularSkills = [
 
 function AuthPage() {
     const navigate = useNavigate();
+    const { user, setUser } = useAuth();
+    useEffect(() => { if (user) navigate("/home", { replace: true }); }, [user, navigate]);
     const [mode, setMode] = useState("login");
     const [step, setStep] = useState("auth");
     const [showPassword, setShowPassword] = useState(false);
@@ -65,6 +69,7 @@ function AuthPage() {
     const [error, setError] = useState("");
     const [notice, setNotice] = useState("");
     const [remember, setRemember] = useState(true);
+    const [busy, setBusy] = useState(false);
     const [selectedSkills, setSelectedSkills] = useState([]);
 
     const [form, setForm] = useState({
@@ -103,7 +108,7 @@ function AuthPage() {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     }
 
-    function handleSubmit(event) {
+    async function handleSubmit(event) {
         event.preventDefault();
         setError("");
         setNotice("");
@@ -134,13 +139,18 @@ function AuthPage() {
                 return;
             }
 
-            // Frontend demo only: no account is created or stored.
+            // Continue to the profile details step before creating the account.
             setStep("profile");
             return;
         }
 
-        setNotice("Demo sign-in complete. Opening your community...");
-        window.setTimeout(() => navigate("/home"), 350);
+        setBusy(true);
+        try {
+            const result = await api.login({ email: form.email.trim(), password: form.password, remember });
+            setUser(result.user);
+            navigate("/home");
+        } catch (requestError) { setError(requestError.message); }
+        finally { setBusy(false); }
     }
 
     function toggleSkill(skill) {
@@ -151,7 +161,7 @@ function AuthPage() {
         );
     }
 
-    function finishProfile(skip = false) {
+    async function finishProfile(skip = false) {
         const profile = {
             name: form.name.trim() || "Your Name",
             headline: [form.course, form.year, "Student"].filter(Boolean).join(" · ") || "Student | Learning and building",
@@ -162,10 +172,13 @@ function AuthPage() {
             skills: selectedSkills,
             location: "",
         };
-        localStorage.setItem("connectly-profile", JSON.stringify(profile));
-        localStorage.setItem("connectly-demo-session", JSON.stringify({ name: profile.name, email: form.email.trim() }));
-        if (skip) localStorage.setItem("connectly-profile", JSON.stringify({ ...profile, skills: [] }));
-        navigate("/home");
+        setBusy(true);
+        try {
+            const result = await api.register({ name: profile.name, email: form.email.trim(), password: form.password, university: profile.university, course: profile.course, year: profile.year, bio: profile.bio, skills: skip ? [] : selectedSkills });
+            setUser(result.user);
+            navigate("/home");
+        } catch (requestError) { setError(requestError.message); setStep("auth"); }
+        finally { setBusy(false); }
     }
 
     function returnToAuth() {
@@ -673,7 +686,7 @@ function AuthPage() {
 
                                     <button
                                         type="button"
-                                        onClick={() => finishProfile(true)}
+                                        onClick={() => finishProfile(true)} disabled={busy}
                                         className="w-full rounded-xl border border-white/10 py-3 text-sm font-medium text-gray-300 transition hover:border-yellow-400/50 hover:text-white"
                                     >
                                         Skip for now
@@ -705,7 +718,7 @@ function AuthPage() {
                                     {form.name
                                         ? `Welcome, ${form.name}! `
                                         : "Welcome! "}
-                                    Your profile setup demo is complete. Your student community
+                                    Your profile setup is ready. Join your student community
                                     is waiting for you.
                                 </p>
 
@@ -775,3 +788,9 @@ function AuthPage() {
 }
 
 export default AuthPage;
+
+
+
+
+
+

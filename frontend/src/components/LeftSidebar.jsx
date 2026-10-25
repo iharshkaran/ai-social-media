@@ -1,22 +1,39 @@
 
+import { useEffect, useState } from "react";
 import { MapPin, GraduationCap, Code2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/useAuth";
+import { useConnectlyStore } from "../store/useConnectlyStore";
 
 function LeftSidebar() {
     const navigate = useNavigate();
-    let profile = {};
-    let posts = [];
-    let connectionCount = 0;
-    try {
-        profile = JSON.parse(localStorage.getItem("connectly-profile") || "{}");
-        posts = JSON.parse(localStorage.getItem("connectly-posts") || "[]");
-        const connections = JSON.parse(localStorage.getItem("connectly-connections") || "{}");
-        connectionCount = Array.isArray(connections.connected) ? connections.connected.length : 0;
-    } catch {
-        // Use the demo profile when browser storage is unavailable.
-    }
-    const name = profile.name || "Your Name";
-    const skills = Array.isArray(profile.skills) ? profile.skills : ["React", "JavaScript", "C++"];
+    const { user } = useAuth();
+    const [postCount, setPostCount] = useState(0);
+    const [connectionCount, setConnectionCount] = useState(0);
+    const profile = user || {};
+    const name = profile.name || "Student";
+    const skills = Array.isArray(profile.skills) ? profile.skills : [];
+
+    useEffect(() => {
+        let active = true;
+        const refresh = async () => {
+            try {
+                const [posts, network] = await Promise.all([useConnectlyStore.getState().loadPosts(), useConnectlyStore.getState().loadConnections()]);
+                if (active) {
+                    setPostCount(posts.filter((post) => post.authorId === user?.id).length);
+                    setConnectionCount(network.connected.length);
+                }
+            } catch {
+                // The feed remains usable when sidebar counts cannot be refreshed.
+            }
+        };
+        refresh();
+        window.addEventListener("connectly:backend-update", refresh);
+        return () => {
+            active = false;
+            window.removeEventListener("connectly:backend-update", refresh);
+        };
+    }, [user?.id]);
     return (
         <div className="space-y-4">
             <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#1b1b1b]">
@@ -28,11 +45,11 @@ function LeftSidebar() {
                     </div>
 
                     <h2 className="mt-3 text-lg font-semibold">{name}</h2>
-                    <p className="text-sm text-gray-400">{profile.headline || "Student · B.Tech CSE"}</p>
+                    <p className="text-sm text-gray-400">{profile.headline || "Add a headline to your profile"}</p>
 
                     <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
                         <MapPin size={14} />
-                        <span>{[profile.university, profile.location].filter(Boolean).join(" · ") || "Your College · Your City"}</span>
+                        <span>{[profile.university, profile.location].filter(Boolean).join(" · ") || "Add your college and city"}</span>
                     </div>
 
                     <div className="my-4 border-t border-white/10" />
@@ -44,7 +61,7 @@ function LeftSidebar() {
                         </div>
 
                         <div className="rounded-xl bg-white/[0.04] p-3">
-                            <p className="text-lg font-bold text-yellow-400">{posts.length}</p>
+                            <p className="text-lg font-bold text-yellow-400">{postCount}</p>
                             <p className="text-xs text-gray-400">Posts</p>
                         </div>
                     </div>

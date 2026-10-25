@@ -1,5 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../context/useAuth";
 import {
   ImagePlus,
   ThumbsUp,
@@ -13,34 +14,9 @@ import {
   BookOpen,
   Award,
 } from "lucide-react";
-import { addNotification } from "../utils/socialStore";
-
-const initialPosts = [
-  {
-    id: 1,
-    name: "Aarav Sharma",
-    role: "B.Tech CSE · 3rd Year",
-    time: "2 hours ago",
-    category: "Project",
-    text: "Just completed a new React project! Learning by building is the best way to grow. 🚀",
-    image: "",
-    likes: 12,
-    comments: [
-      { id: 101, name: "Riya", text: "Looks great! Keep building 🚀" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Priya Verma",
-    role: "Computer Science Student",
-    time: "5 hours ago",
-    category: "Learning",
-    text: "Consistency beats motivation. One DSA problem and one new concept every day. Let's grow together! 💛",
-    image: "",
-    likes: 24,
-    comments: [],
-  },
-];
+import { api } from "../utils/api";
+import { useConnectlyStore } from "../store/useConnectlyStore";
+import { uploadImageToImageKit } from "../utils/imagekitUpload";
 
 const categories = [
   { name: "General", icon: BookOpen },
@@ -58,35 +34,40 @@ const categoryColors = {
   Achievement: "text-green-300 bg-green-400/10",
 };
 
-function loadPosts() {
-  try {
-    const saved = localStorage.getItem("connectly-posts");
-    return saved ? JSON.parse(saved) : initialPosts;
-  } catch {
-    return initialPosts;
-  }
-}
-
 function Feed() {
-  const [posts, setPosts] = useState(loadPosts);
+  const { user } = useAuth();
+  const [posts, setPosts] = useState([]);
   const [postText, setPostText] = useState("");
   const [category, setCategory] = useState("General");
   const [image, setImage] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageProgress, setImageProgress] = useState(0);
   const [openComments, setOpenComments] = useState([]);
   const [commentDrafts, setCommentDrafts] = useState({});
   const [likedPosts, setLikedPosts] = useState([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const imageInputRef = useRef(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("connectly-posts", JSON.stringify(posts));
-    } catch {
-      // Keep the current session usable if browser storage has reached its limit.
-    }
-  }, [posts]);
+    let active = true;
+    useConnectlyStore.getState().loadPosts()
+      .then((items) => { if (active) { setPosts(items); setLikedPosts(items.filter((post) => post.liked).map((post) => post.id)); } })
+      .catch((requestError) => { if (active) setError(requestError.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
-  function handleImageChange(event) {
+  function updatePosts(update) {
+    setPosts((current) => {
+      const next = update(current);
+      useConnectlyStore.getState().updateCachedPosts(next);
+      return next;
+    });
+  }
+
+  async function handleImageChange(event) {
     const file = event.target.files?.[0];
 
     if (!file) return;
@@ -103,81 +84,78 @@ function Feed() {
       return;
     }
 
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      setImage(String(reader.result));
-      setError("");
-    };
-
-    reader.onerror = () => {
-      setError("Could not read that image. Please try another.");
-    };
-
-    reader.readAsDataURL(file);
+    const preview = URL.createObjectURL(file);
+    setImagePreview(preview);
+    setImage("");
+    setImageUploading(true);
+    setImageProgress(0);
+    setError("");
+    try {
+      const uploaded = await uploadImageToImageKit(file, "/connectly/posts", setImageProgress);
+      setImage(uploaded.url);
+    } catch (uploadError) {
+      URL.revokeObjectURL(preview);
+      setImagePreview("");
+      setError(uploadError.message);
+      event.target.value = "";
+    } finally {
+      setImageUploading(false);
+    }
   }
 
-  function createPost() {
+  async function createPost() {
+    if (imageUploading) return;
     if (!postText.trim() && !image) {
       setError("Write something or add an image before posting.");
       return;
     }
 
-    let profile = {};
-    try { profile = JSON.parse(localStorage.getItem("connectly-profile") || "{}"); } catch { /* Use demo defaults. */ }
-    const newPost = {
-      id: Date.now(),
-      name: profile.name || "Your Name",
-      role: [profile.course, profile.year, profile.university].filter(Boolean).join(" · ") || "Student · Connectly member",
-      avatar: profile.photo || "",
-      time: "Just now",
-      category,
-      text: postText.trim(),
-      image,
-      likes: 0,
-      comments: [],
-    };
-
-    setPosts((current) => [newPost, ...current]);
+    try {
+      const saved = await api.createPost({ text: postText.trim(), image, category });
+      updatePosts((current) => [saved, ...current]);
+      window.dispatchEvent(new Event("connectly:backend-update"));
+    } catch (requestError) { setError(requestError.message); return; }
     setPostText("");
     setCategory("General");
     setImage("");
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview("");
+    setImageProgress(0);
     setError("");
-    addNotification({ type: "post", title: "Post shared", message: `You shared a ${category.toLowerCase()} update.` });
 
     if (imageInputRef.current) {
       imageInputRef.current.value = "";
     }
   }
 
-  function deletePost(postId) {
+  async function deletePost(postId) {
     const confirmed = window.confirm("Delete this post?");
     if (!confirmed) return;
 
-    setPosts((current) => current.filter((post) => post.id !== postId));
+    try { await api.deletePost(postId); } catch (requestError) { setError(requestError.message); return; }
+    updatePosts((current) => current.filter((post) => post.id !== postId));
     setLikedPosts((current) => current.filter((id) => id !== postId));
+    window.dispatchEvent(new Event("connectly:backend-update"));
   }
 
-  function toggleLike(postId) {
+  async function toggleLike(postId) {
     const alreadyLiked = likedPosts.includes(postId);
-    const post = posts.find((item) => item.id === postId);
-
+    let result;
+    try { result = await api.toggleLike(postId); } catch (requestError) { setError(requestError.message); return; }
     setLikedPosts((current) =>
       alreadyLiked
         ? current.filter((id) => id !== postId)
         : [...current, postId]
     );
 
-    setPosts((current) =>
+    updatePosts((current) =>
       current.map((post) =>
         post.id === postId
-          ? { ...post, likes: Math.max(0, post.likes + (alreadyLiked ? -1 : 1)) }
+          ? { ...post, likes: result.likes, liked: result.liked }
           : post
       )
     );
-    if (!alreadyLiked && post) {
-      addNotification({ type: "like", title: "You liked a post", message: `You reacted to ${post.name}'s update.` });
-    }
+    window.dispatchEvent(new Event("connectly:backend-update"));
   }
 
   function toggleComments(postId) {
@@ -188,34 +166,30 @@ function Feed() {
     );
   }
 
-  function addComment(event, postId) {
+  async function addComment(event, postId) {
     event.preventDefault();
     const text = (commentDrafts[postId] || "").trim();
 
     if (!text) return;
 
-    setPosts((current) =>
+    let savedComment;
+    try { savedComment = await api.comment(postId, text); } catch (requestError) { setError(requestError.message); return; }
+    updatePosts((current) =>
       current.map((post) =>
         post.id === postId
           ? {
               ...post,
               comments: [
                 ...post.comments,
-                {
-                  id: Date.now(),
-                  name: "You",
-                  text,
-                },
+                savedComment,
               ],
             }
           : post
       )
     );
 
-    const post = posts.find((item) => item.id === postId);
-    if (post) addNotification({ type: "comment", title: "You commented on a post", message: `You joined the conversation on ${post.name}'s update.` });
-
     setCommentDrafts((current) => ({ ...current, [postId]: "" }));
+    window.dispatchEvent(new Event("connectly:backend-update"));
   }
 
   async function sharePost(post) {
@@ -255,19 +229,22 @@ function Feed() {
           className="mt-4 w-full resize-y rounded-xl border border-white/10 bg-[#202020] p-4 text-sm leading-6 text-white outline-none placeholder:text-gray-500 focus:border-yellow-400"
         />
 
-        {image && (
+        {imagePreview && (
           <div className="relative mt-3">
             <img
-              src={image}
+              src={imagePreview}
               alt="Post preview"
               className="max-h-80 w-full rounded-xl border border-white/10 object-contain"
             />
             <button
               type="button"
               onClick={() => {
+                if (imagePreview.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
                 setImage("");
+                setImagePreview("");
                 if (imageInputRef.current) imageInputRef.current.value = "";
               }}
+              disabled={imageUploading}
               aria-label="Remove selected image"
               className="absolute right-2 top-2 rounded-full bg-black/80 p-2 text-white hover:bg-black"
             >
@@ -275,6 +252,7 @@ function Feed() {
             </button>
           </div>
         )}
+        {imageUploading && <p className="mt-2 text-xs text-gray-400">Uploading photo to ImageKit… {imageProgress}%</p>}
 
         <div className="mt-4">
           <p className="mb-2 text-xs font-medium text-gray-400">
@@ -306,6 +284,7 @@ function Feed() {
               type="file"
               accept="image/*"
               onChange={handleImageChange}
+              disabled={imageUploading}
               className="hidden"
               id="post-image"
             />
@@ -314,18 +293,18 @@ function Feed() {
               className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-gray-400 hover:bg-white/[0.05] hover:text-yellow-400"
             >
               <ImagePlus size={18} />
-              Add photo
+              {imageUploading ? "Uploading photo…" : image ? "Photo uploaded" : "Add photo"}
             </label>
           </div>
 
           <button
             type="button"
             onClick={createPost}
-            disabled={!postText.trim() && !image}
+            disabled={imageUploading || (!postText.trim() && !image)}
             className="flex items-center gap-2 rounded-xl bg-yellow-400 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Send size={16} />
-            Post
+            {imageUploading ? "Uploading…" : "Post"}
           </button>
         </div>
 
@@ -337,7 +316,8 @@ function Feed() {
       </section>
 
       {/* FEED POSTS */}
-      {posts.length === 0 && (
+      {loading && <section className="rounded-2xl border border-white/10 bg-[#1b1b1b] px-5 py-12 text-center text-sm text-gray-400">Loading your feed...</section>}
+      {!loading && posts.length === 0 && !error && (
         <section className="rounded-2xl border border-white/10 bg-[#1b1b1b] px-5 py-12 text-center">
           <BookOpen size={32} className="mx-auto text-yellow-400" />
           <h3 className="mt-4 font-semibold">Your feed is waiting</h3>
@@ -348,7 +328,7 @@ function Feed() {
       )}
 
       {posts.map((post) => {
-        const liked = likedPosts.includes(post.id);
+        const liked = likedPosts.includes(post.id) || post.liked;
         const comments = Array.isArray(post.comments) ? post.comments : [];
 
         return (
@@ -364,7 +344,7 @@ function Feed() {
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-sm font-semibold">{post.name}</h3>
                 <p className="mt-1 text-xs text-gray-400">{post.role}</p>
-                <p className="mt-1 text-xs text-gray-500">{post.time}</p>
+                <p className="mt-1 text-xs text-gray-500">{post.time ? new Date(post.time).toLocaleString() : "Just now"}</p>
               </div>
 
               <div className="flex flex-col items-end gap-2">
@@ -376,7 +356,7 @@ function Feed() {
                   {post.category || "General"}
                 </span>
 
-                {(post.name === "Your Name" || post.name === (() => { try { return JSON.parse(localStorage.getItem("connectly-profile") || "{}").name; } catch { return ""; } })()) && (
+                {post.authorId === user?.id && (
                   <button
                     type="button"
                     aria-label="Delete post"
@@ -509,3 +489,4 @@ function Feed() {
 }
 
 export default Feed;
+

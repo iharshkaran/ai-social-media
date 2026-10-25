@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Camera,
   GraduationCap,
@@ -11,7 +11,9 @@ import {
   ExternalLink,
 } from "lucide-react";
 import Navbar from "../components/Navbar";
-import { addNotification } from "../utils/socialStore";
+import { api } from "../utils/api";
+import { useAuth } from "../context/useAuth";
+import { uploadImageToImageKit } from "../utils/imagekitUpload";
 
 const defaultProfile = {
   name: "Your Name",
@@ -21,31 +23,21 @@ const defaultProfile = {
   year: "",
   location: "",
   bio: "",
-  skills: ["JavaScript", "React", "C++"],
+  skills: [],
   photo: "",
   portfolioUrl: "",
 };
 
-function getSavedProfile() {
-  try {
-    const saved = localStorage.getItem("connectly-profile");
-    return saved ? { ...defaultProfile, ...JSON.parse(saved) } : defaultProfile;
-  } catch {
-    return defaultProfile;
-  }
-}
-
 function Profile() {
-  const [profile, setProfile] = useState(getSavedProfile);
+  const { user, setUser } = useAuth();
+  const [profile, setProfile] = useState(() => ({ ...defaultProfile, ...user }));
   const [draft, setDraft] = useState(profile);
   const [editing, setEditing] = useState(false);
   const [newSkill, setNewSkill] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
   const [photoError, setPhotoError] = useState("");
-
-  useEffect(() => {
-    localStorage.setItem("connectly-profile", JSON.stringify(profile));
-  }, [profile]);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState(0);
 
   function updateField(event) {
     setDraft((current) => ({
@@ -54,20 +46,22 @@ function Profile() {
     }));
   }
 
-  function saveProfile(event) {
+  async function saveProfile(event) {
     event.preventDefault();
-    setProfile(draft);
-    setEditing(false);
-    setSavedMessage("Profile updated successfully!");
-    addNotification({
-      type: "profile",
-      title: "Profile updated",
-      message: "Your profile details have been saved.",
-    });
+    try {
+      const { user } = await api.updateProfile(draft);
+      const updatedProfile = { ...defaultProfile, ...user };
+      setUser(user);
+      setProfile(updatedProfile);
+      setDraft(updatedProfile);
+      setEditing(false);
+      setSavedMessage("Profile updated successfully!");
+      window.dispatchEvent(new Event("connectly:backend-update"));
+    } catch (error) { setSavedMessage(error.message); }
     window.setTimeout(() => setSavedMessage(""), 2500);
   }
 
-  function handlePhotoChange(event) {
+  async function handlePhotoChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -81,13 +75,18 @@ function Profile() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDraft((current) => ({ ...current, photo: String(reader.result) }));
-      setPhotoError("");
-    };
-    reader.onerror = () => setPhotoError("This photo could not be opened. Try another one.");
-    reader.readAsDataURL(file);
+    setPhotoUploading(true);
+    setPhotoProgress(0);
+    setPhotoError("");
+    try {
+      const uploaded = await uploadImageToImageKit(file, "/connectly/profiles", setPhotoProgress);
+      setDraft((current) => ({ ...current, photo: uploaded.url }));
+    } catch (error) {
+      setPhotoError(error.message);
+      event.target.value = "";
+    } finally {
+      setPhotoUploading(false);
+    }
   }
 
   function cancelEditing() {
@@ -149,7 +148,7 @@ function Profile() {
                 {editing && (
                   <label htmlFor="profile-photo" className="absolute -bottom-2 -right-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-[#1b1b1b] bg-yellow-400 text-black" title="Change profile photo">
                     <Camera size={16} />
-                    <input id="profile-photo" type="file" accept="image/*" onChange={handlePhotoChange} className="sr-only" />
+                    <input id="profile-photo" type="file" accept="image/*" onChange={handlePhotoChange} className="sr-only" disabled={photoUploading} />
                   </label>
                 )}
               </div>
@@ -174,6 +173,7 @@ function Profile() {
               </p>
             )}
             {photoError && <p role="alert" className="mt-3 text-sm text-red-300">{photoError}</p>}
+            {editing && photoUploading && <p role="status" className="mt-3 text-sm text-gray-400">Uploading profile photo to ImageKit… {photoProgress}%</p>}
 
             {editing ? (
               <form onSubmit={saveProfile} className="mt-6 space-y-5">
@@ -353,7 +353,8 @@ function Profile() {
                 <div className="flex flex-wrap gap-3 pt-2">
                   <button
                     type="submit"
-                    className="flex items-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-semibold text-black hover:bg-yellow-300"
+                    disabled={photoUploading}
+                    className="flex items-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-semibold text-black hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Save size={17} />
                     Save changes
@@ -362,7 +363,8 @@ function Profile() {
                   <button
                     type="button"
                     onClick={cancelEditing}
-                    className="rounded-xl border border-white/10 px-5 py-3 text-sm text-gray-300 hover:bg-white/5"
+                    disabled={photoUploading}
+                    className="rounded-xl border border-white/10 px-5 py-3 text-sm text-gray-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -442,3 +444,4 @@ function Profile() {
 }
 
 export default Profile;
+

@@ -1,9 +1,10 @@
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { addNotification, readConnections, saveConnections } from "../utils/socialStore";
-import students from "../data/students";
+import { api } from "../utils/api";
+import { useConnectlyStore } from "../store/useConnectlyStore";
+
 import {
   Search,
   MapPin,
@@ -15,76 +16,79 @@ import {
 } from "lucide-react";
 
 const filters = ["All", "B.Tech CSE", "B.Tech IT", "BCA", "B.Tech AI/ML"];
+const colors = ["bg-blue-500/20 text-blue-300", "bg-pink-500/20 text-pink-300", "bg-purple-500/20 text-purple-300", "bg-yellow-500/20 text-yellow-300", "bg-green-500/20 text-green-300", "bg-orange-500/20 text-orange-300"];
+async function loadExploreData(query = "", force = false) {
+  const [people, network] = await Promise.all([useConnectlyStore.getState().loadStudents(query, force), useConnectlyStore.getState().loadConnections(force)]);
+  const students = people.map((person, index) => ({ ...person, id: String(person.id), initials: person.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2), college: person.university || "University not added", course: person.course || person.headline || "Student", year: person.year || "", location: person.location || "", skills: person.skills || [], color: colors[index % colors.length] }));
+  return { students, network };
+}
 
 export default function Explore() {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") || "");
   const [selectedCourse, setSelectedCourse] = useState("All");
-  const [connections, setConnections] = useState(readConnections);
-  const connectedPeople = connections.connected.map((connection) => {
-    if (typeof connection === "object") return connection;
-    return students.find((student) => student.id === connection);
-  }).filter(Boolean);
+  const [students, setStudents] = useState([]);
+  const [connections, setConnections] = useState({ incoming: [], outgoing: [], connected: [] });
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState("");
+  const [error, setError] = useState("");
+
+  async function refreshData(force = false) {
+    try {
+      const { students: people, network } = await loadExploreData(search, force);
+      setStudents(people);
+      setConnections(network);
+      setError("");
+    } catch (requestError) { setError(requestError.message); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      loadExploreData(search).then(({ students: people, network }) => { if (active) { setStudents(people); setConnections(network); setError(""); } }).catch((requestError) => { if (active) setError(requestError.message); }).finally(() => { if (active) setLoading(false); });
+    };
+    const initialTimer = window.setTimeout(load, 250);
+    const refreshTimer = window.setInterval(load, 20000);
+    return () => { active = false; window.clearTimeout(initialTimer); window.clearInterval(refreshTimer); };
+  }, [search]);
 
   const filteredStudents = useMemo(() => {
     const term = search.trim().toLowerCase();
-
     return students.filter((student) => {
-      const matchesSearch =
-        !term ||
-        student.name.toLowerCase().includes(term) ||
-        student.college.toLowerCase().includes(term) ||
-        student.skills.some((skill) =>
-          skill.toLowerCase().includes(term)
-        );
-
-      const matchesCourse =
-        selectedCourse === "All" ||
-        student.course === selectedCourse;
-
+      const matchesSearch = !term || student.name.toLowerCase().includes(term) || student.college.toLowerCase().includes(term) || student.skills.some((skill) => skill.toLowerCase().includes(term));
+      const matchesCourse = selectedCourse === "All" || student.course === selectedCourse || (selectedCourse.startsWith("B.Tech") && student.course === "B.Tech");
       return matchesSearch && matchesCourse;
     });
-  }, [search, selectedCourse]);
+  }, [students, search, selectedCourse]);
 
-  function toggleConnection(studentId) {
-    const nextOutgoing = { ...connections.outgoing };
-    const wasPending = nextOutgoing[studentId] === "pending";
-    if (wasPending) delete nextOutgoing[studentId];
-    else nextOutgoing[studentId] = "pending";
-
-    const next = { ...connections, outgoing: nextOutgoing };
-    setConnections(next);
-    saveConnections(next);
-    if (!wasPending) {
-      const student = students.find((item) => item.id === studentId);
-      addNotification({ type: "connection", title: "Connection request sent", message: `You sent a connection request to ${student?.name || "a student"}.` });
-    }
+  async function toggleConnection(studentId) {
+    setBusyId(studentId);
+    setError("");
+    try {
+      const existing = connections.outgoing.find((request) => request.studentId === studentId);
+      if (existing) await api.removeConnection(existing.id);
+      else await api.requestConnection(studentId);
+      await refreshData(true);
+      window.dispatchEvent(new Event("connectly:backend-update"));
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusyId(""); }
   }
 
-  function respondToRequest(request, accept) {
-    const acceptedPerson = {
-      id: request.studentId ?? request.id,
-      name: request.name,
-      role: request.role,
-      initials: request.initials || request.name.slice(0, 1),
-    };
-    const next = {
-      ...connections,
-      incoming: connections.incoming.filter((item) => item.id !== request.id),
-      connected: accept && !connections.connected.some((item) => (typeof item === "object" ? item.id : item) === acceptedPerson.id)
-        ? [...connections.connected, acceptedPerson]
-        : connections.connected,
-    };
-    setConnections(next);
-    saveConnections(next);
-    if (accept) {
-      addNotification({ type: "connection", title: "You're connected", message: `You and ${request.name} are now connected.` });
-    }
+  async function respondToRequest(request, accept) {
+    setBusyId(request.id);
+    setError("");
+    try {
+      await api.respondConnection(request.id, accept ? "accept" : "reject");
+      await refreshData(true);
+      window.dispatchEvent(new Event("connectly:backend-update"));
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusyId(""); }
   }
-
   return (
     <div className="min-h-screen bg-[#111111] text-white">
       <Navbar />
+      {error && <p role="alert" className="mx-auto max-w-7xl px-4 pt-4 text-sm text-red-300 sm:px-6 lg:px-8">{error}</p>}
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -114,32 +118,10 @@ export default function Explore() {
                 <div key={request.id} className="flex flex-wrap items-center gap-3 py-4 first:pt-0 last:pb-0">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pink-400/15 font-semibold text-pink-300">{request.initials || request.name.slice(0, 1)}</div>
                   <div className="min-w-0 flex-1"><p className="font-medium">{request.name}</p><p className="text-sm text-gray-400">{request.role}</p></div>
-                  {request.sample && <span className="text-xs text-gray-500">Preview request</span>}
                   <div className="flex gap-2">
                     <button onClick={() => respondToRequest(request, true)} className="rounded-lg bg-yellow-400 px-3 py-2 text-xs font-semibold text-black hover:bg-yellow-300">Accept</button>
                     <button onClick={() => respondToRequest(request, false)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300 hover:bg-white/5">Decline</button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {connectedPeople.length > 0 && (
-          <section className="mb-8 rounded-2xl border border-white/10 bg-[#1b1b1b] p-5">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">Your connections</h2>
-                <p className="mt-1 text-sm text-gray-400">Students in your growing network.</p>
-              </div>
-              <span className="text-sm text-gray-500">{connectedPeople.length}</span>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {connectedPeople.map((person) => (
-                <div key={person.id} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-400/10 font-semibold text-green-300">{person.initials || person.name.slice(0, 1)}</div>
-                  <div className="min-w-0"><p className="truncate text-sm font-medium">{person.name}</p><p className="truncate text-xs text-gray-400">{person.role}</p></div>
-                  <UserCheck size={17} className="ml-auto shrink-0 text-green-300" />
                 </div>
               ))}
             </div>
@@ -186,11 +168,11 @@ export default function Explore() {
           </span>
         </div>
 
-        {filteredStudents.length > 0 ? (
+        {loading ? <p className="rounded-2xl border border-white/10 bg-[#1b1b1b] px-5 py-14 text-center text-sm text-gray-400">Loading students...</p> : filteredStudents.length > 0 ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {filteredStudents.map((student) => {
-              const isPending = connections.outgoing[student.id] === "pending";
-              const isConnected = connections.connected.some((item) => (typeof item === "object" ? item.id : item) === student.id);
+              const isPending = connections.outgoing.some((request) => request.studentId === student.id);
+              const isConnected = connections.connected.some((item) => item.studentId === student.id);
 
               return (
                 <article
@@ -210,7 +192,7 @@ export default function Explore() {
                   </div>
 
                   <h3 className="mt-4 text-lg font-semibold">
-                    {student.name}
+                    <Link to={`/profile/${student.id}`} className="transition hover:text-yellow-300">{student.name}</Link>
                   </h3>
 
                   <p className="mt-1 text-sm text-gray-400">
@@ -252,7 +234,7 @@ export default function Explore() {
 
                   <button
                     onClick={() => toggleConnection(student.id)}
-                    disabled={isConnected}
+                    disabled={isConnected || busyId === student.id || loading}
                     className={`mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                       isConnected
                         ? "cursor-default border border-green-400/20 bg-green-400/10 text-green-300"
@@ -304,3 +286,7 @@ export default function Explore() {
     </div>
   );
 }
+
+
+
+
