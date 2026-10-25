@@ -1,7 +1,23 @@
+import { useState } from "react";
 import { ExternalLink, FileText } from "lucide-react";
 
+function getPdfThumbnailUrl(url) {
+  try {
+    const thumbnail = new URL(url);
+    thumbnail.pathname = `${thumbnail.pathname.replace(/\/$/, "")}/ik-thumbnail.jpg`;
+    // PDF pages can have transparent backgrounds; set white so the generated
+    // thumbnail doesn't appear black in browsers and mobile previews.
+    thumbnail.searchParams.set("tr", "pg-1,w-1200,f-jpg,bg-FFFFFF");
+    return thumbnail.toString();
+  } catch {
+    return "";
+  }
+}
+
 function PdfPreview({ url, name = "Shared document", compact = false }) {
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
   if (!url) return null;
+  const thumbnailUrl = getPdfThumbnailUrl(url);
 
   return (
     <section className={`mt-4 overflow-hidden rounded-2xl border-2 border-[#191a32] bg-white shadow-[3px_4px_0_#191a32] ${compact ? "" : ""}`} aria-label={`PDF preview: ${name}`}>
@@ -18,12 +34,25 @@ function PdfPreview({ url, name = "Shared document", compact = false }) {
         </a>
       </header>
       <div className="bg-[#e8e5e0] p-2 sm:p-3">
-        <iframe
-          src={`${url}#toolbar=1&navpanes=0&view=FitH`}
-          title={`${name} PDF preview`}
-          loading="lazy"
-          className={`block w-full rounded-lg border border-[#d8d0c1] bg-white ${compact ? "h-[360px] sm:h-[440px]" : "h-[480px] sm:h-[640px]"}`}
-        />
+        {thumbnailUrl && !thumbnailFailed ? (
+          <a href={url} target="_blank" rel="noreferrer" aria-label={`Open full PDF: ${name}`} className="group relative block overflow-hidden rounded-lg border border-[#d8d0c1] bg-white">
+            <img
+              src={thumbnailUrl}
+              alt={`First page of ${name}`}
+              loading="lazy"
+              decoding="async"
+              onError={() => setThumbnailFailed(true)}
+              className={`mx-auto block w-full object-contain ${compact ? "max-h-[520px]" : "max-h-[720px]"}`}
+            />
+            <span className="absolute bottom-3 right-3 rounded-full bg-[#191a32]/85 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow transition group-hover:opacity-100 group-focus-visible:opacity-100">Open full PDF</span>
+          </a>
+        ) : (
+          <a href={url} target="_blank" rel="noreferrer" className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-[#d8d0c1] bg-white px-5 py-10 text-center text-sm text-[#6e6a7b]">
+            <FileText size={32} className="text-[#6f56d9]" />
+            <span className="mt-3 font-semibold text-[#17182d]">Preview isn’t available here</span>
+            <span className="mt-1">Open the PDF to view the document.</span>
+          </a>
+        )}
       </div>
     </section>
   );

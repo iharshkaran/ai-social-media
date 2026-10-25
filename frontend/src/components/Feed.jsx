@@ -41,7 +41,8 @@ const categoryColors = {
 
 function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreated }) {
   const { user } = useAuth();
-  const [posts, setPosts] = useState([]);
+  const cachedPosts = useConnectlyStore.getState().posts;
+  const [posts, setPosts] = useState(() => cachedPosts || []);
   const [postText, setPostText] = useState("");
   const [category, setCategory] = useState("General");
   const [image, setImage] = useState("");
@@ -53,14 +54,14 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   const [openComments, setOpenComments] = useState([]);
   const [commentDrafts, setCommentDrafts] = useState({});
   const [submittingComments, setSubmittingComments] = useState([]);
-  const [likedPosts, setLikedPosts] = useState([]);
+  const [likedPosts, setLikedPosts] = useState(() => (cachedPosts || []).filter((post) => post.liked).map((post) => post.id));
   const [error, setError] = useState("");
   const [shareFeedback, setShareFeedback] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [deletingPost, setDeletingPost] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !composerOnly && !Array.isArray(cachedPosts));
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(() => useConnectlyStore.getState().postsHasMore);
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const pdfInputRef = useRef(null);

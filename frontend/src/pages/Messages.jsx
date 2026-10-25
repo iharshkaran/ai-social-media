@@ -5,13 +5,29 @@ import Navbar from "../components/Navbar";
 import { api } from "../utils/api";
 import { useConnectlyStore } from "../store/useConnectlyStore";
 
+function mergeChats(network, inbox) {
+  const inboxItems = Array.isArray(inbox) ? inbox : [];
+  const connectedItems = Array.isArray(network?.connected) ? network.connected : [];
+  const inboxById = new Map(inboxItems.map((chat) => [chat.userId, chat]));
+  const connected = connectedItems.map((person) => ({
+    ...person,
+    userId: person.studentId,
+    lastMessage: inboxById.get(person.studentId)?.lastMessage || "Start a conversation",
+    unreadCount: inboxById.get(person.studentId)?.unreadCount || 0,
+  }));
+  const known = new Set(connected.map((chat) => chat.userId));
+  return [...inboxItems.filter((chat) => !known.has(chat.userId)), ...connected];
+}
+
 export default function Messages() {
-  const [chats, setChats] = useState([]);
+  const cachedConnections = useConnectlyStore.getState().connections;
+  const cachedInbox = useConnectlyStore.getState().inbox;
+  const [chats, setChats] = useState(() => mergeChats(cachedConnections, cachedInbox));
   const [activeId, setActiveId] = useState("");
   const [messages, setMessages] = useState([]);
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => cachedConnections === null && cachedInbox === null);
   const [threadLoading, setThreadLoading] = useState(false);
   const [error, setError] = useState("");
   const active = chats.find((chat) => chat.userId === activeId);
@@ -22,10 +38,7 @@ export default function Messages() {
     const refreshInbox = () => Promise.all([useConnectlyStore.getState().loadConnections(), useConnectlyStore.getState().loadInbox()])
       .then(([network, inbox]) => {
         if (!mounted) return;
-        const inboxById = new Map(inbox.map((chat) => [chat.userId, chat]));
-        const connected = network.connected.map((person) => ({ ...person, userId: person.studentId, lastMessage: inboxById.get(person.studentId)?.lastMessage || "Start a conversation", unreadCount: inboxById.get(person.studentId)?.unreadCount || 0 }));
-        const known = new Set(connected.map((chat) => chat.userId));
-        setChats([...inbox.filter((chat) => !known.has(chat.userId)), ...connected]);
+        setChats(mergeChats(network, inbox));
         setError("");
       })
       .catch((requestError) => { if (mounted) setError(requestError.message); })
