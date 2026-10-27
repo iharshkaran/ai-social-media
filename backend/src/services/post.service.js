@@ -70,6 +70,16 @@ export async function createPost({ authorId, data }) {
   return formatPost(post);
 }
 
+export async function updatePost({ postId, authorId, data }) {
+  const post = await Post.findOneAndUpdate(
+    { _id: postId, author: authorId },
+    { $set: data },
+    { new: true, runValidators: true },
+  );
+  if (!post) throw httpError(404, "Post not found or you cannot edit it.");
+  return getPostById({ postId: post._id, userId: authorId });
+}
+
 export async function deletePost({ postId, authorId }) {
   const post = await Post.findOneAndDelete({ _id: postId, author: authorId });
   if (!post) throw httpError(404, "Post not found or you cannot delete it.");

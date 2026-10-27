@@ -1,4 +1,4 @@
-import { createPost, deletePost, getPostById, listPosts, togglePostLike } from "../services/post.service.js";
+import { createPost, deletePost, getPostById, listPosts, togglePostLike, updatePost } from "../services/post.service.js";
 
 export async function getPosts(req, res) {
   const result = await listPosts({ userId: req.user._id, page: req.query.page, limit: req.query.limit });
@@ -8,6 +8,11 @@ export async function getPosts(req, res) {
 export async function addPost(req, res) {
   const post = await createPost({ authorId: req.user._id, data: req.validated });
   return res.status(201).json({ success: true, data: post });
+}
+
+export async function editPost(req, res) {
+  const post = await updatePost({ postId: req.params.id, authorId: req.user._id, data: req.validated });
+  return res.json({ success: true, data: post, message: "Post updated successfully." });
 }
 
 export async function getPost(req, res) {

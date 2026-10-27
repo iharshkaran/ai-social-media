@@ -4,12 +4,14 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import {
   ImagePlus,
+  LoaderCircle,
   ThumbsUp,
   MessageCircle,
   Share2,
   Send,
   X,
   Trash2,
+  Pencil,
   BookOpen,
   Video,
   FileText,
@@ -20,6 +22,7 @@ import { useConnectlyStore } from "../store/useConnectlyStore";
 import { uploadFileToImageKit } from "../utils/imagekitUpload";
 import { notificationTime } from "../utils/socialStore";
 import PostCaption from "./PostCaption";
+import PostEditModal from "./PostEditModal";
 import PdfPreview from "./PdfPreview";
 import { removeRapidDuplicateComments } from "../utils/comments";
 
@@ -48,6 +51,7 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   const [image, setImage] = useState("");
   const [imagePreview, setImagePreview] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
+  const [postingPost, setPostingPost] = useState(false);
   const [imageProgress, setImageProgress] = useState(0);
   const [media, setMedia] = useState(null);
   const [mediaPreview, setMediaPreview] = useState("");
@@ -59,6 +63,7 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   const [shareFeedback, setShareFeedback] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [deletingPost, setDeletingPost] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
   const [loading, setLoading] = useState(() => !composerOnly && !Array.isArray(cachedPosts));
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(() => useConnectlyStore.getState().postsHasMore);
@@ -70,6 +75,9 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   const [categoryOpen, setCategoryOpen] = useState(false);
   const shareFeedbackTimer = useRef(null);
   const submittingCommentsRef = useRef(new Set());
+  const postingPostRef = useRef(false);
+  const pendingLikesRef = useRef(new Set());
+  const [pendingLikes, setPendingLikes] = useState([]);
 
   useEffect(() => () => {
     if (shareFeedbackTimer.current) window.clearTimeout(shareFeedbackTimer.current);
@@ -199,12 +207,15 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   }
 
   async function createPost() {
-    if (imageUploading) return;
+    if (imageUploading || postingPostRef.current) return;
     if (!postText.trim() && !image && !media?.url) {
       setError("Write something or attach a file before posting.");
       return;
     }
 
+    postingPostRef.current = true;
+    setPostingPost(true);
+    setError("");
     try {
       const saved = await api.createPost({ text: postText.trim(), image, mediaUrl: media?.url || "", mediaType: media?.url ? media.type : "", mediaName: media?.url ? media.name : "", category });
       if (composerOnly) {
@@ -212,7 +223,13 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
         useConnectlyStore.getState().updateCachedPosts([saved, ...cachedPosts.filter((post) => post.id !== saved.id)]);
       } else updatePosts((current) => [saved, ...current]);
       window.dispatchEvent(new Event("connectly:backend-update"));
-    } catch (requestError) { setError(requestError.message); return; }
+    } catch (requestError) {
+      setError(requestError.message);
+      return;
+    } finally {
+      postingPostRef.current = false;
+      setPostingPost(false);
+    }
     setPostText("");
     if (postTextareaRef.current) {
       postTextareaRef.current.style.height = "56px";
@@ -257,9 +274,16 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   }
 
   async function toggleLike(postId) {
+    if (pendingLikesRef.current.has(postId)) return;
+    pendingLikesRef.current.add(postId);
+    setPendingLikes((current) => [...current, postId]);
     const alreadyLiked = likedPosts.includes(postId);
     let result;
     try { result = await api.toggleLike(postId); } catch (requestError) { setError(requestError.message); return; }
+    finally {
+      pendingLikesRef.current.delete(postId);
+      setPendingLikes((current) => current.filter((id) => id !== postId));
+    }
     setLikedPosts((current) =>
       alreadyLiked
         ? current.filter((id) => id !== postId)
@@ -315,21 +339,44 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
   }
 
   async function sharePost(post) {
-    const shareText = `${post.name} on OrbitU:\n${post.text}`;
+    const postUrl = new URL(`/post/${encodeURIComponent(post.id)}`, window.location.origin).toString();
+    const shareText = `${post.name} on OrbitU${post.text ? `:\n${post.text}` : " shared a post."}`;
+    const clipboardText = `${shareText}\n${postUrl}`;
+
+    async function copyPostLink() {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(clipboardText);
+        return;
+      }
+
+      const textArea = document.createElement("textarea");
+      textArea.value = clipboardText;
+      textArea.setAttribute("readonly", "");
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.select();
+      const copied = document.execCommand("copy");
+      textArea.remove();
+      if (!copied) throw new Error("Clipboard access is unavailable.");
+    }
 
     try {
       if (navigator.share) {
-        await navigator.share({ title: "OrbitU post", text: shareText });
+        await navigator.share({ title: "OrbitU post", text: shareText, url: postUrl });
         showShareFeedback("Post shared successfully.");
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareText);
-        showShareFeedback("Post text copied to clipboard.");
       } else {
-        showShareFeedback("Sharing is not available in this browser.");
+        await copyPostLink();
+        showShareFeedback("Post link copied to clipboard.");
       }
     } catch (error) {
-      if (error.name !== "AbortError") {
-        showShareFeedback("Unable to share this post right now.");
+      if (error.name === "AbortError") return;
+
+      try {
+        await copyPostLink();
+        showShareFeedback("Post link copied to clipboard.");
+      } catch {
+        showShareFeedback("Could not share or copy the post link. Please try again.");
       }
     }
   }
@@ -364,6 +411,17 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
             </div>
           </section>
         </div>
+      )}
+      {!composerOnly && editingPost && (
+        <PostEditModal
+          post={editingPost}
+          onClose={() => setEditingPost(null)}
+          onSaved={(updatedPost) => {
+            updatePosts((current) => current.map((item) => item.id === updatedPost.id ? updatedPost : item));
+            setLikedPosts((current) => updatedPost.liked && !current.includes(updatedPost.id) ? [...current, updatedPost.id] : current.filter((id) => id !== updatedPost.id || updatedPost.liked));
+            window.dispatchEvent(new Event("connectly:backend-update"));
+          }}
+        />
       )}
       {/* CREATE POST */}
       <section id="feed-composer" className={`${hideComposerOnMobile ? "hidden sm:block " : ""}scroll-mt-24 rounded-[26px] border-2 border-[#191a32] bg-white p-3 shadow-[4px_5px_0_#191a32] sm:p-4`}>
@@ -473,11 +531,12 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
           <button
             type="button"
             onClick={createPost}
-            disabled={imageUploading || (!postText.trim() && !image && !media?.url)}
-            className="flex items-center gap-2 rounded-xl bg-[#ffe35b] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#f3d446] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={imageUploading || postingPost || (!postText.trim() && !image && !media?.url)}
+            aria-busy={postingPost || imageUploading}
+            className="flex min-w-24 items-center justify-center gap-2 rounded-xl bg-[#ffe35b] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#f3d446] disabled:cursor-wait disabled:opacity-50"
           >
-            <Send size={16} />
-            {imageUploading ? "Uploading…" : "Post"}
+            {postingPost || imageUploading ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
+            {postingPost ? "Posting…" : imageUploading ? "Uploading…" : "Post"}
           </button>
         </div>
 
@@ -531,15 +590,26 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
                 </span>
 
                 {post.authorId === user?.id && (
-                  <button
-                    type="button"
-                    aria-label="Delete post"
-                    title="Delete post"
-                    onClick={() => deletePost(post.id)}
-                    className="rounded-lg p-1.5 text-[#858191] hover:bg-red-400/10 hover:text-[#a33b48]"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label="Edit post"
+                      title="Edit post"
+                      onClick={() => setEditingPost(post)}
+                      className="rounded-lg p-1.5 text-[#858191] hover:bg-[#eee9ff] hover:text-[#5947a8]"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Delete post"
+                      title="Delete post"
+                      onClick={() => deletePost(post.id)}
+                      className="rounded-lg p-1.5 text-[#858191] hover:bg-red-400/10 hover:text-[#a33b48]"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -578,8 +648,9 @@ function Feed({ composerOnly = false, hideComposerOnMobile = false, onPostCreate
             <div className="grid grid-cols-3 gap-1 pt-3 sm:gap-2">
               <button
                 type="button"
+                disabled={pendingLikes.includes(post.id)}
                 onClick={() => toggleLike(post.id)}
-                className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs transition hover:bg-[#f4f0e8] sm:text-sm ${
+                className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs transition hover:bg-[#f4f0e8] disabled:cursor-wait disabled:opacity-50 sm:text-sm ${
                   liked ? "text-[#6f56d9]" : "text-[#6e6a7b]"
                 }`}
               >

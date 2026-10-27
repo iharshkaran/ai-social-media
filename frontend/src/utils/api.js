@@ -37,6 +37,7 @@ export const api = {
   post: (id) => request(`/posts/${encodeURIComponent(id)}`),
   postComments: (id) => request(`/posts/${encodeURIComponent(id)}/comments`),
   createPost: (payload) => request("/posts", { method: "POST", body: JSON.stringify(payload) }),
+  updatePost: (id, payload) => request(`/posts/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deletePost: (id) => request(`/posts/${id}`, { method: "DELETE" }),
   toggleLike: (id) => request(`/posts/${id}/like`, { method: "POST" }),
   comment: (id, text) => request(`/posts/${id}/comments`, { method: "POST", body: JSON.stringify({ text }) }),

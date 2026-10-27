@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Heart, MessageCircle, Send, Share2 } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Pencil, Send, Share2 } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { api } from "../utils/api";
 import { useAuth } from "../context/useAuth";
 import { notificationTime } from "../utils/socialStore";
 import PdfPreview from "../components/PdfPreview";
 import { removeRapidDuplicateComments } from "../utils/comments";
+import PostEditModal from "../components/PostEditModal";
 
 function PostDetail() {
   const { id } = useParams();
@@ -18,6 +19,8 @@ function PostDetail() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shareFeedback, setShareFeedback] = useState("");
+  const [editingPost, setEditingPost] = useState(false);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -30,19 +33,21 @@ function PostDetail() {
   }, [id]);
 
   async function toggleLike() {
-    if (!post) return;
+    if (!post || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const result = await api.toggleLike(post.id);
       setPost((current) => ({ ...current, likes: result.likes, liked: result.liked }));
     } catch (requestError) { setError(requestError.message); }
-    finally { setBusy(false); }
+    finally { busyRef.current = false; setBusy(false); }
   }
 
   async function submitComment(event) {
     event.preventDefault();
     const text = draft.trim();
-    if (!text || !post) return;
+    if (!text || !post || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const saved = await api.comment(post.id, text);
@@ -50,7 +55,7 @@ function PostDetail() {
       setDraft("");
       window.dispatchEvent(new Event("connectly:backend-update"));
     } catch (requestError) { setError(requestError.message); }
-    finally { setBusy(false); }
+    finally { busyRef.current = false; setBusy(false); }
   }
 
   async function sharePost() {
@@ -72,9 +77,14 @@ function PostDetail() {
   return <div className="min-h-screen orbit-pattern-bg text-[#17182d]"><Navbar /><main className="mx-auto max-w-6xl px-4 py-6 pb-28 sm:px-6 lg:px-8">
     <Link to={profileLink} className="mb-5 inline-flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-[#514e62] hover:bg-white/70 hover:text-[#5947a8]"><ArrowLeft size={17} /> Back to profile</Link>
     {error && <p role="alert" className="mb-4 rounded-xl border border-red-400/20 bg-white px-4 py-3 text-sm text-[#a33b48]">{error}</p>}
+    {editingPost && post && <PostEditModal post={post} onClose={() => setEditingPost(false)} onSaved={(updatedPost) => {
+      setPost(updatedPost);
+      setComments(removeRapidDuplicateComments(updatedPost.comments || []));
+      window.dispatchEvent(new Event("connectly:backend-update"));
+    }} />}
     {loading ? <div className="rounded-[26px] border-2 border-[#191a32] bg-white p-12 text-center text-sm text-[#6e6a7b] shadow-[4px_5px_0_#c9bcff]">Loading post…</div> : post ? <article className="mx-auto grid max-w-6xl overflow-hidden rounded-[26px] border-2 border-[#191a32] bg-white shadow-[5px_6px_0_#c9bcff] lg:grid-cols-[3fr_2fr]">
       <div className="flex min-w-0 flex-col border-b border-[#e7dfd0] lg:border-b-0 lg:border-r">
-        <header className="flex items-center gap-3 border-b border-[#e7dfd0] p-4 sm:p-5"><Link to={profileLink} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#191a32] bg-[#eee9ff] font-bold text-[#5947a8]">{post.avatar ? <img src={post.avatar} alt="" className="h-full w-full object-cover" /> : post.name?.slice(0, 1)}</Link><div className="min-w-0 flex-1"><Link to={profileLink} className="block truncate text-sm font-bold hover:text-[#5947a8]">{post.name}</Link><p className="mt-0.5 truncate text-xs text-[#6e6a7b]">{post.role || "OrbitU student"}</p><p className="mt-1 text-[11px] text-[#858191]">{notificationTime(post.time)}</p></div><span className="rounded-full bg-[#eee9ff] px-3 py-1 text-[10px] font-bold text-[#5947a8]">{post.category || "General"}</span></header>
+        <header className="flex items-center gap-3 border-b border-[#e7dfd0] p-4 sm:p-5"><Link to={profileLink} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#191a32] bg-[#eee9ff] font-bold text-[#5947a8]">{post.avatar ? <img src={post.avatar} alt="" className="h-full w-full object-cover" /> : post.name?.slice(0, 1)}</Link><div className="min-w-0 flex-1"><Link to={profileLink} className="block truncate text-sm font-bold hover:text-[#5947a8]">{post.name}</Link><p className="mt-0.5 truncate text-xs text-[#6e6a7b]">{post.role || "OrbitU student"}</p><p className="mt-1 text-[11px] text-[#858191]">{notificationTime(post.time)}</p></div><div className="flex shrink-0 flex-col items-end gap-2"><span className="rounded-full bg-[#eee9ff] px-3 py-1 text-[10px] font-bold text-[#5947a8]">{post.category || "General"}</span>{post.authorId === user?.id && <button type="button" onClick={() => setEditingPost(true)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-[#6e6a7b] hover:bg-[#eee9ff] hover:text-[#5947a8]"><Pencil size={13} />Edit</button>}</div></header>
         {hasMedia && (post.mediaType === "pdf" ? <div className="p-3 sm:p-5"><PdfPreview url={post.mediaUrl} name={post.mediaName || "Shared document"} /></div> : <div className="flex min-h-64 flex-1 items-center justify-center bg-[#191a32] lg:min-h-[680px]">{post.image ? <img src={post.image} alt="Post attachment" className="max-h-[78vh] w-full object-contain" /> : post.mediaType === "video" ? <video src={post.mediaUrl} controls playsInline className="max-h-[78vh] w-full" /> : null}</div>)}
         <div className="p-5 sm:p-7">{post.text ? <p className="whitespace-pre-wrap break-words text-sm leading-7 text-[#343247]">{post.text}</p> : !hasMedia ? <p className="rounded-2xl bg-[#fff9e8] p-5 text-xs text-[#858191]">A post shared with the OrbitU community.</p> : <p className="text-sm text-[#858191]">Shared with the OrbitU community.</p>}</div>
       </div>
